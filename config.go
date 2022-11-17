@@ -13,16 +13,6 @@ import (
 // YAML, JSON and HCL file formats are supported.
 // Configuration is stored into global config.Config instance.
 func LoadConfig(files ...string) error {
-	envs := map[string]string{}
-	for _, env := range os.Environ() {
-		s := strings.SplitN(env, "=", 2)
-		envName := s[0]
-
-		envs[envName] = envNameToConfigKey(envName)
-	}
-
-	config.LoadOSEnvs(envs)
-
 	if len(files) > 0 {
 		config.AddDriver(yamlv3.Driver)
 		config.AddDriver(json.Driver)
@@ -33,6 +23,16 @@ func LoadConfig(files ...string) error {
 			return err
 		}
 	}
+
+	envs := map[string]string{}
+	for _, env := range os.Environ() {
+		s := strings.SplitN(env, "=", 2)
+		envName := s[0]
+
+		envs[envName] = envNameToConfigKey(envName)
+	}
+
+	config.LoadOSEnvs(envs)
 
 	return nil
 }
