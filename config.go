@@ -11,7 +11,8 @@ import (
 
 // LoadConfig loads configuration from environment variables and optionally from the specified list of files.
 // YAML, JSON and HCL file formats are supported.
-func LoadConfig(files ...string) (*config.Config, error) {
+// Configuration is stored into global config.Config instance.
+func LoadConfig(files ...string) error {
 	envs := map[string]string{}
 	for _, env := range os.Environ() {
 		s := strings.SplitN(env, "=", 2)
@@ -20,21 +21,20 @@ func LoadConfig(files ...string) (*config.Config, error) {
 		envs[envName] = envNameToConfigKey(envName)
 	}
 
-	c := config.NewWithOptions("config")
-	c.LoadOSEnvs(envs)
+	config.LoadOSEnvs(envs)
 
 	if len(files) > 0 {
-		c.AddDriver(yamlv3.Driver)
-		c.AddDriver(json.Driver)
-		c.AddDriver(hcl.Driver)
+		config.AddDriver(yamlv3.Driver)
+		config.AddDriver(json.Driver)
+		config.AddDriver(hcl.Driver)
 
-		err := c.LoadFiles(files...)
+		err := config.LoadFiles(files...)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
-	return c, nil
+	return nil
 }
 
 func envNameToConfigKey(envName string) string {
