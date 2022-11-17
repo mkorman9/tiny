@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func SmokeTest(t *testing.T) {
+func TestSmokeTest(t *testing.T) {
 	SetupLogger()
 	err := LoadConfig()
 
