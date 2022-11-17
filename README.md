@@ -2,13 +2,23 @@
 
 tiny is a Go library for rapid prototyping backend applications.
 
-### Install
+## Install
 ```bash
 go get github.com/mkorman9/tiny
 ```
 
-### Example
+## Example
+
 ```go
+package main
+
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/gookit/config/v2"
+	"github.com/mkorman9/tiny"
+	"github.com/mkorman9/tiny/tinyhttp"
+)
+
 func main() {
 	_ = tiny.LoadConfig()
 	tiny.SetupLogger()

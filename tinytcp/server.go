@@ -51,7 +51,7 @@ func (s *Server) ForkingStrategy(forkingStrategy ForkingStrategy) {
 	s.forkingStrategy = forkingStrategy
 }
 
-// Start implements the interface of coreutil.Service.
+// Start implements the interface of tiny.Service.
 func (s *Server) Start() error {
 	if s.forkingStrategy == nil {
 		log.Error().Msg(
@@ -118,7 +118,7 @@ func (s *Server) Start() error {
 	return nil
 }
 
-// Stop implements the interface of coreutil.Service.
+// Stop implements the interface of tiny.Service.
 func (s *Server) Stop() {
 	if s.listener == nil {
 		return
