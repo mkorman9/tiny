@@ -4,7 +4,8 @@ import (
 	"google.golang.org/grpc"
 )
 
-type serverConfig struct {
+// ServerConfig holds a configuration for NewServer.
+type ServerConfig struct {
 	address            string
 	grpcOptions        []grpc.ServerOption
 	unaryInterceptors  []grpc.UnaryServerInterceptor
@@ -12,18 +13,18 @@ type serverConfig struct {
 }
 
 // ServerOpt is an option to be specified to NewServer.
-type ServerOpt = func(*serverConfig)
+type ServerOpt = func(*ServerConfig)
 
 // Address is an address to bind to (default: "0.0.0.0:9000").
 func Address(address string) ServerOpt {
-	return func(serverConfig *serverConfig) {
+	return func(serverConfig *ServerConfig) {
 		serverConfig.address = address
 	}
 }
 
 // ServerOptions allows to specify custom grpc.ServerOption options.
 func ServerOptions(opts ...grpc.ServerOption) ServerOpt {
-	return func(serverConfig *serverConfig) {
+	return func(serverConfig *ServerConfig) {
 		for _, opt := range opts {
 			serverConfig.grpcOptions = append(serverConfig.grpcOptions, opt)
 		}
@@ -32,7 +33,7 @@ func ServerOptions(opts ...grpc.ServerOption) ServerOpt {
 
 // UnaryInterceptor adds specified interceptor to the tail of unary interceptors chains.
 func UnaryInterceptor(interceptor grpc.UnaryServerInterceptor) ServerOpt {
-	return func(serverConfig *serverConfig) {
+	return func(serverConfig *ServerConfig) {
 		serverConfig.unaryInterceptors = append(
 			serverConfig.unaryInterceptors,
 			interceptor,
@@ -42,7 +43,7 @@ func UnaryInterceptor(interceptor grpc.UnaryServerInterceptor) ServerOpt {
 
 // StreamInterceptor adds specified interceptor to the tail of stream interceptors chains.
 func StreamInterceptor(interceptor grpc.StreamServerInterceptor) ServerOpt {
-	return func(serverConfig *serverConfig) {
+	return func(serverConfig *ServerConfig) {
 		serverConfig.streamInterceptors = append(
 			serverConfig.streamInterceptors,
 			interceptor,
@@ -52,7 +53,7 @@ func StreamInterceptor(interceptor grpc.StreamServerInterceptor) ServerOpt {
 
 // EnableAuthMiddlewareFunc makes server use token-based authorization based on passed TokenVerifierFunc.
 func EnableAuthMiddlewareFunc[T any](verifierFunc TokenVerifierFunc[T]) ServerOpt {
-	return func(serverConfig *serverConfig) {
+	return func(serverConfig *ServerConfig) {
 		UnaryInterceptor(authUnaryInterceptor(verifierFunc))(serverConfig)
 		StreamInterceptor(authStreamInterceptor(verifierFunc))(serverConfig)
 	}

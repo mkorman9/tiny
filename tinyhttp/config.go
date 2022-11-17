@@ -10,6 +10,9 @@ type ServerConfig struct {
 	// Address is an address to bind server socket to (default: "0.0.0.0:8080").
 	Address string
 
+	// Network is a network type for the listener (default: "tcp").
+	Network string
+
 	// SecurityHeaders defines whether to include HTTP security headers to all responses or not (default: true).
 	SecurityHeaders bool
 
@@ -56,6 +59,13 @@ type ServerOpt = func(*ServerConfig)
 func Address(address string) ServerOpt {
 	return func(config *ServerConfig) {
 		config.Address = address
+	}
+}
+
+// Network is a network type for the listener.
+func Network(network string) ServerOpt {
+	return func(config *ServerConfig) {
+		config.Network = network
 	}
 }
 

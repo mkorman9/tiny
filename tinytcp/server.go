@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// Server represents a TCP server, and conforms to the coreutil.Service interface.
+// Server represents a TCP server, and conforms to the tiny.Service interface.
 type Server struct {
 	config               *ServerConfig
 	listener             net.Listener

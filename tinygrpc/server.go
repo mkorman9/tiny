@@ -15,7 +15,7 @@ type Server struct {
 
 // NewServer create new Server using global configuration and provided options.
 func NewServer(opts ...ServerOpt) *Server {
-	serverConfig := serverConfig{
+	serverConfig := ServerConfig{
 		address: "0.0.0.0:9000",
 	}
 

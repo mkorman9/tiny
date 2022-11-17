@@ -7,12 +7,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 	"io"
+	"net"
 	"net/http"
 	"sync"
 	"time"
 )
 
-// Server is an object representing gin.Engine and implementing the lifecycle.Service interface.
+// Server is an object representing gin.Engine and implementing the tiny.Service interface.
 type Server struct {
 	*gin.Engine
 
@@ -27,6 +28,7 @@ type Server struct {
 func NewServer(opts ...ServerOpt) *Server {
 	config := ServerConfig{
 		Address:         "0.0.0.0:8080",
+		Network:         "tcp",
 		SecurityHeaders: true,
 		ShutdownTimeout: 5 * time.Second,
 		TLSConfig:       &tls.Config{},
@@ -61,7 +63,6 @@ func (server *Server) Start() error {
 	log.Info().Msgf("HTTP server started (%s)", server.config.Address)
 
 	httpServer := &http.Server{
-		Addr:              server.config.Address,
 		Handler:           server.Engine,
 		TLSConfig:         server.config.TLSConfig,
 		ReadTimeout:       server.config.ReadTimeout,
@@ -75,11 +76,15 @@ func (server *Server) Start() error {
 	server.httpServer = httpServer
 	server.httpServerLock.Unlock()
 
-	var err error
+	l, err := net.Listen(server.config.Network, server.config.Address)
+	if err != nil {
+		return err
+	}
+
 	if server.config.TLSCert != "" && server.config.TLSKey != "" {
-		err = httpServer.ListenAndServeTLS(server.config.TLSCert, server.config.TLSKey)
+		err = httpServer.ServeTLS(l, server.config.TLSCert, server.config.TLSKey)
 	} else {
-		err = httpServer.ListenAndServe()
+		err = httpServer.Serve(l)
 	}
 
 	if err != nil && err != http.ErrServerClosed {
