@@ -13,6 +13,11 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+var (
+	// ErrRedirect is return when client reaches its maximum number of redirects when performing HTTP request.
+	ErrRedirect = errors.New("redirect limit exceeded")
+)
+
 // Client is an HTTP client, capable of executing HTTP requests and performing retries.
 type Client struct {
 	config     *ClientConfig
@@ -22,11 +27,10 @@ type Client struct {
 // NewClient creates an instance of Client using given options.
 func NewClient(opts ...ClientOpt) *Client {
 	config := &ClientConfig{
-		Network:          "tcp",
-		Timeout:          10 * time.Second,
-		MaxRetries:       0,
-		RetryDelayFactor: 0,
-		TLSConfig:        &tls.Config{},
+		Network:      "tcp",
+		Timeout:      10 * time.Second,
+		MaxRedirects: 10,
+		TLSConfig:    &tls.Config{},
 	}
 
 	for _, opt := range opts {
@@ -35,6 +39,14 @@ func NewClient(opts ...ClientOpt) *Client {
 
 	httpClient := &http.Client{
 		Timeout: config.Timeout,
+		Jar:     config.CookieJar,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= config.MaxRedirects {
+				return ErrRedirect
+			} else {
+				return nil
+			}
+		},
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 				if config.Address != "" {
@@ -66,6 +78,7 @@ func NewClient(opts ...ClientOpt) *Client {
 
 // Send tries to send given HTTP request and return a response.
 // Depending on the configuration specified, requests might be retried on error.
+// If client reaches its maximum number of redirects - both the latest response and ErrRedirect are returned.
 func (client *Client) Send(request *http.Request) (*http.Response, error) {
 	for retry := 0; retry <= client.config.MaxRetries; retry++ {
 		response, err := client.httpClient.Do(request)
@@ -75,6 +88,10 @@ func (client *Client) Send(request *http.Request) (*http.Response, error) {
 		if err != nil {
 			urlError, isUrlError := err.(*url.Error)
 			if !isUrlError {
+				if errors.Is(err, ErrRedirect) {
+					return response, ErrRedirect
+				}
+
 				return nil, err
 			}
 

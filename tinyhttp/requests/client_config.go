@@ -2,6 +2,7 @@ package requests
 
 import (
 	"crypto/tls"
+	"net/http"
 	"time"
 )
 
@@ -25,6 +26,10 @@ type ClientConfig struct {
 	// (default: 0).
 	MaxRetries int
 
+	// MaxRedirects is a maximum number of redirects the client will perform before failing with ErrRedirect.
+	// (default: 10).
+	MaxRedirects int
+
 	// RetryDelayFactor is a factor used to calculate the delay time between subsequent retries.
 	// The formula is: retryNumber * RetryDelayFactor.
 	// (default: 0).
@@ -32,6 +37,9 @@ type ClientConfig struct {
 
 	// TLSConfig is an optional TLS configuration to pass when using TLS.
 	TLSConfig *tls.Config
+
+	// CookieJar is a collection of cookies to use in all requests initiated by the client.
+	CookieJar http.CookieJar
 }
 
 // ClientOpt is an option to be passed to NewClient.
@@ -74,6 +82,17 @@ func MaxRetries(maxRetries int) ClientOpt {
 	}
 }
 
+// MaxRedirects is a maximum number of redirects the client will perform before failing with ErrRedirect.
+func MaxRedirects(maxRedirects int) ClientOpt {
+	return func(config *ClientConfig) {
+		if maxRedirects < 0 {
+			maxRedirects = 0
+		}
+
+		config.MaxRedirects = maxRedirects
+	}
+}
+
 // RetryDelayFactor is a factor used to calculate the delay time between subsequent retries.
 // The formula is: retryNumber * RetryDelayFactor.
 func RetryDelayFactor(retryDelayFactor time.Duration) ClientOpt {
@@ -86,5 +105,12 @@ func RetryDelayFactor(retryDelayFactor time.Duration) ClientOpt {
 func TLSConfig(tlsConfig *tls.Config) ClientOpt {
 	return func(config *ClientConfig) {
 		config.TLSConfig = tlsConfig
+	}
+}
+
+// CookieJar is a collection of cookies to use in all requests initiated by the client.
+func CookieJar(cookieJar http.CookieJar) ClientOpt {
+	return func(config *ClientConfig) {
+		config.CookieJar = cookieJar
 	}
 }
