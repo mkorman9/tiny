@@ -14,7 +14,8 @@ import (
 	"strings"
 )
 
-type requestConfig struct {
+// RequestConfig holds a configuration for request while it's constructed.
+type RequestConfig struct {
 	method  string
 	url     string
 	body    io.Reader
@@ -23,19 +24,22 @@ type requestConfig struct {
 	cookies []*http.Cookie
 }
 
-type RequestOpt = func(*requestConfig) error
+// RequestOpt is an option to be specified to NewRequest.
+type RequestOpt = func(*RequestConfig) error
 
-type Part struct {
+// RequestPart represents a single part of the HTTP multipart form.
+type RequestPart struct {
 	fieldName string
 	fileName  string
-	data      interface{}
+	data      any
 	diskPath  string
 }
 
+// NewRequest constructs a request using given options.
 func NewRequest(opts ...RequestOpt) (*http.Request, error) {
-	config := &requestConfig{
+	config := &RequestConfig{
 		method:  "GET",
-		headers: make(map[string]string),
+		headers: map[string]string{},
 	}
 
 	for _, opt := range opts {
@@ -53,7 +57,7 @@ func NewRequest(opts ...RequestOpt) (*http.Request, error) {
 		request.Header.Set(header, value)
 	}
 
-	if len(config.host) != 0 {
+	if config.host != "" {
 		request.Host = config.host
 	}
 
@@ -75,30 +79,35 @@ var (
 	CONNECT = Method("CONNECT")
 )
 
+// Method is a method of the HTTP request (default: "GET").
 func Method(method string) RequestOpt {
-	return func(config *requestConfig) error {
+	return func(config *RequestConfig) error {
 		config.method = method
 		return nil
 	}
 }
 
+// URL is a target URL of the HTTP request.
 func URL(url string) RequestOpt {
-	return func(config *requestConfig) error {
+	return func(config *RequestConfig) error {
 		config.url = url
 		return nil
 	}
 }
 
+// Body is an optional body to be included in the request.
 func Body(body io.Reader) RequestOpt {
-	return func(config *requestConfig) error {
+	return func(config *RequestConfig) error {
 		config.body = body
 		return nil
 	}
 }
 
+// JSONBody is an optional body to be included in the request.
+// Given value is first converted to JSON and then appended to the request.
 func JSONBody(body interface{}) RequestOpt {
-	return func(config *requestConfig) error {
-		buffer := new(bytes.Buffer)
+	return func(config *RequestConfig) error {
+		buffer := &bytes.Buffer{}
 		encoder := json.NewEncoder(buffer)
 
 		err := encoder.Encode(body)
@@ -112,16 +121,18 @@ func JSONBody(body interface{}) RequestOpt {
 	}
 }
 
+// FormBody is an optional form data to be included in the request.
 func FormBody(form *url.Values) RequestOpt {
-	return func(config *requestConfig) error {
+	return func(config *RequestConfig) error {
 		config.body = strings.NewReader(form.Encode())
 		config.headers["Content-Type"] = "application/x-www-form-urlencoded"
 		return nil
 	}
 }
 
-func MultipartForm(parts ...*Part) RequestOpt {
-	return func(config *requestConfig) error {
+// MultipartForm is an optional multipart form data to be included in the request.
+func MultipartForm(parts ...*RequestPart) RequestOpt {
+	return func(config *RequestConfig) error {
 		var filesToClose []*os.File
 
 		var buffer bytes.Buffer
@@ -178,55 +189,64 @@ func MultipartForm(parts ...*Part) RequestOpt {
 	}
 }
 
+// Header sets a request header specified by the given key.
 func Header(key, value string) RequestOpt {
-	return func(config *requestConfig) error {
+	return func(config *RequestConfig) error {
 		config.headers[key] = value
 		return nil
 	}
 }
 
+// BearerToken sets Authorization request header to "Bearer %token%".
 func BearerToken(token string) RequestOpt {
 	return Header("Authorization", fmt.Sprintf("Bearer %s", token))
 }
 
+// BasicAuth sets Authorization request header to "Basic base64(%username%:%password%)".
 func BasicAuth(username, password string) RequestOpt {
 	authString := fmt.Sprintf("%s:%s", username, password)
 	base64AuthString := base64.StdEncoding.EncodeToString([]byte(authString))
 	return Header("Authorization", fmt.Sprintf("Basic %s", base64AuthString))
 }
 
+// UserAgent sets User-Agent request header.
 func UserAgent(userAgent string) RequestOpt {
 	return Header("User-Agent", userAgent)
 }
 
+// ContentType sets Content-Type request header.
 func ContentType(contentType string) RequestOpt {
 	return Header("Content-Type", contentType)
 }
 
+// Host overwrites the Host header value. If not provided, the host is extracted from the URL.
 func Host(host string) RequestOpt {
-	return func(config *requestConfig) error {
+	return func(config *RequestConfig) error {
 		config.host = host
 		return nil
 	}
 }
 
+// Cookie adds HTTP request cookie.
 func Cookie(cookie *http.Cookie) RequestOpt {
-	return func(config *requestConfig) error {
+	return func(config *RequestConfig) error {
 		config.cookies = append(config.cookies, cookie)
 		return nil
 	}
 }
 
-func PartFromData(fieldName, fileName string, data interface{}) *Part {
-	return &Part{
+// PartFromData creates a part of multipart form from the in-memory buffer.
+func PartFromData(fieldName, fileName string, data any) *RequestPart {
+	return &RequestPart{
 		fieldName: fieldName,
 		fileName:  fileName,
 		data:      data,
 	}
 }
 
-func PartFromDiskFile(fieldName, fileName, diskPath string) *Part {
-	return &Part{
+// PartFromDiskFile creates a part of multipart form from the disk file.
+func PartFromDiskFile(fieldName, fileName, diskPath string) *RequestPart {
+	return &RequestPart{
 		fieldName: fieldName,
 		fileName:  fileName,
 		diskPath:  diskPath,
