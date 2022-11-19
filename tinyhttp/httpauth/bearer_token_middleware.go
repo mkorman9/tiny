@@ -2,7 +2,6 @@ package httpauth
 
 import (
 	"github.com/gin-gonic/gin"
-	"net/http"
 	"strings"
 )
 
@@ -11,54 +10,18 @@ type VerifyTokenFunc = func(c *gin.Context, token string) (*VerificationResult, 
 
 // NewBearerTokenMiddleware creates new bearer-token based Middleware.
 // This middleware reads Authorization header and expects it to begin with "Bearer" string.
-func NewBearerTokenMiddleware(verifyToken VerifyTokenFunc, opts ...MiddlewareOpt) Middleware {
-	handlers := middlewareHandlers{}
+func NewBearerTokenMiddleware(verifyToken VerifyTokenFunc, opts ...MiddlewareOpt) *Middleware {
+	config := MiddlewareConfig{}
 	for _, opt := range opts {
-		opt(&handlers)
+		opt(&config)
 	}
 
 	return newMiddleware(
-		func(rolesCheckingFunc rolesCheckingFunc) gin.HandlerFunc {
-			return func(c *gin.Context) {
-				token := extractToken(c)
-
-				verificationResult, err := verifyToken(c, token)
-				if err != nil {
-					if handlers.errorHandler != nil {
-						handlers.errorHandler(c, err)
-						return
-					}
-
-					c.AbortWithStatus(http.StatusInternalServerError)
-					return
-				}
-
-				if !verificationResult.Verified {
-					if handlers.unverifiedHandler != nil {
-						handlers.unverifiedHandler(c)
-						return
-					}
-
-					c.AbortWithStatus(http.StatusUnauthorized)
-					return
-				}
-
-				rolesCheckingResult := rolesCheckingFunc(verificationResult.Roles)
-
-				if !rolesCheckingResult {
-					if handlers.accessDeniedHandler != nil {
-						handlers.accessDeniedHandler(c)
-						return
-					}
-
-					c.AbortWithStatus(http.StatusForbidden)
-					return
-				}
-
-				setSessionData(c, verificationResult.SessionData)
-				c.Next()
-			}
+		func(c *gin.Context) (*VerificationResult, error) {
+			token := extractToken(c)
+			return verifyToken(c, token)
 		},
+		&config,
 	)
 }
 

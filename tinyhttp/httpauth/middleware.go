@@ -1,6 +1,9 @@
 package httpauth
 
-import "github.com/gin-gonic/gin"
+import (
+	"github.com/gin-gonic/gin"
+	"net/http"
+)
 
 // VerificationResult is a structure returned by the user-provided token/cookie verification functions.
 type VerificationResult struct {
@@ -17,44 +20,41 @@ type VerificationResult struct {
 	SessionData any
 }
 
+type middlewareAction = func(*gin.Context) (*VerificationResult, error)
 type rolesCheckingFunc = func(roles []string) bool
-type middlewareHandler = func(rolesCheckingFunc rolesCheckingFunc) gin.HandlerFunc
 
 // Middleware is an interface that represents a generic authorization middleware.
 // It provides user-friendly API that can be easily integrated with existing Gin request handlers.
 // Underlying implementation might utilize Basic Auth, Bearer-Token or other mechanisms but this API is transparent.
-type Middleware interface {
-	// Authenticated enables access to all authenticated clients, no matter the roles.
-	Authenticated() gin.HandlerFunc
-
-	// AnyOfRoles enables access to only those clients who have at least one of the given roles associated with them.
-	AnyOfRoles(allowedRoles ...string) gin.HandlerFunc
-
-	// AllOfRoles enables access to only those clients who have all specified roles associated with them.
-	AllOfRoles(requiredRoles ...string) gin.HandlerFunc
+type Middleware struct {
+	action middlewareAction
+	config *MiddlewareConfig
 }
 
-type middleware struct {
-	handler middlewareHandler
+func newMiddleware(action middlewareAction, config *MiddlewareConfig) *Middleware {
+	return &Middleware{
+		action: action,
+		config: config,
+	}
 }
 
-func newMiddleware(handler middlewareHandler) *middleware {
-	return &middleware{handler}
-}
-
-func (m *middleware) Authenticated() gin.HandlerFunc {
-	return m.handler(func(_ []string) bool {
+// Authenticated enables access to all authenticated clients, no matter the roles.
+func (m *Middleware) Authenticated() gin.HandlerFunc {
+	checkRoles := func(_ []string) bool {
 		return true
-	})
+	}
+
+	return m.authorize(m.action, m.config, checkRoles)
 }
 
-func (m *middleware) AnyOfRoles(allowedRoles ...string) gin.HandlerFunc {
+// AnyOfRoles enables access to only those clients who have at least one of the given roles associated with them.
+func (m *Middleware) AnyOfRoles(allowedRoles ...string) gin.HandlerFunc {
 	allowedRolesSet := make(map[string]struct{})
 	for _, role := range allowedRoles {
 		allowedRolesSet[role] = struct{}{}
 	}
 
-	return m.handler(func(providedRoles []string) bool {
+	checkRoles := func(providedRoles []string) bool {
 		for _, role := range providedRoles {
 			if _, ok := allowedRolesSet[role]; ok {
 				return true
@@ -62,11 +62,14 @@ func (m *middleware) AnyOfRoles(allowedRoles ...string) gin.HandlerFunc {
 		}
 
 		return false
-	})
+	}
+
+	return m.authorize(m.action, m.config, checkRoles)
 }
 
-func (m *middleware) AllOfRoles(requiredRoles ...string) gin.HandlerFunc {
-	return m.handler(func(providedRoles []string) bool {
+// AllOfRoles enables access to only those clients who have all specified roles associated with them.
+func (m *Middleware) AllOfRoles(requiredRoles ...string) gin.HandlerFunc {
+	checkRoles := func(providedRoles []string) bool {
 		for _, role := range requiredRoles {
 			hasRole := false
 			for _, providedRole := range providedRoles {
@@ -82,5 +85,50 @@ func (m *middleware) AllOfRoles(requiredRoles ...string) gin.HandlerFunc {
 		}
 
 		return true
-	})
+	}
+
+	return m.authorize(m.action, m.config, checkRoles)
+}
+
+func (m *Middleware) authorize(
+	action middlewareAction,
+	config *MiddlewareConfig,
+	checkRoles rolesCheckingFunc,
+) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		verificationResult, err := action(c)
+		if err != nil {
+			if config.errorHandler != nil {
+				config.errorHandler(c, err)
+				return
+			}
+
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+
+		if !verificationResult.Verified {
+			if config.unverifiedHandler != nil {
+				config.unverifiedHandler(c)
+				return
+			}
+
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+
+		rolesCheckingResult := checkRoles(verificationResult.Roles)
+		if !rolesCheckingResult {
+			if config.accessDeniedHandler != nil {
+				config.accessDeniedHandler(c)
+				return
+			}
+
+			c.AbortWithStatus(http.StatusForbidden)
+			return
+		}
+
+		setSessionData(c, verificationResult.SessionData)
+		c.Next()
+	}
 }
