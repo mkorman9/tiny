@@ -10,16 +10,16 @@ type SignalHandler func(signal os.Signal)
 
 // SignalsListener is a listener of OS signals that implements the Service interface.
 type SignalsListener struct {
-	signals     []os.Signal
 	handler     SignalHandler
+	signals     []os.Signal
 	stopChannel chan struct{}
 }
 
 // NewSignalsListener creates new SignalsListener.
-func NewSignalsListener(signals []os.Signal, handler SignalHandler) *SignalsListener {
+func NewSignalsListener(handler SignalHandler, signals ...os.Signal) *SignalsListener {
 	return &SignalsListener{
-		signals:     signals,
 		handler:     handler,
+		signals:     signals,
 		stopChannel: make(chan struct{}),
 	}
 }
