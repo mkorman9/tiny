@@ -28,13 +28,13 @@ func DialPostgres(opts ...Opt) (*Client, error) {
 		opt(&config)
 	}
 
-	if config.DSN == "" {
-		return nil, errors.New("DSN cannot be empty")
+	if config.URL == "" {
+		return nil, errors.New("URL cannot be empty")
 	}
 
 	gormConfig := &gorm.Config{
 		Logger:      &gormLogger{verbose: config.Verbose},
-		NowFunc:     func() time.Time { return time.Now().UTC() },
+		NowFunc:     time.Now().UTC,
 		QueryFields: true,
 	}
 
@@ -44,7 +44,7 @@ func DialPostgres(opts ...Opt) (*Client, error) {
 
 	log.Debug().Msg("Establishing Postgres connection")
 
-	db, err := gorm.Open(postgres.Open(config.DSN), gormConfig)
+	db, err := gorm.Open(postgres.Open(config.URL), gormConfig)
 	if err == nil {
 		sqlDB, err := db.DB()
 		if err != nil {

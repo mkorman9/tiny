@@ -7,8 +7,8 @@ import (
 
 // Config holds a configuration for Client.
 type Config struct {
-	// DSN is a string that contains basic connection data.
-	DSN string
+	// URL is a string that contains basic connection data.
+	URL string
 
 	// Verbose specifies whether to log all executed queries.
 	Verbose bool
@@ -31,10 +31,10 @@ type Config struct {
 // Opt is an option to be specified to DialPostgres.
 type Opt = func(*Config)
 
-// DSN is a string that contains basic connection data.
-func DSN(dsn string) Opt {
+// URL is a string that contains basic connection data.
+func URL(url string) Opt {
 	return func(config *Config) {
-		config.DSN = dsn
+		config.URL = url
 	}
 }
 
