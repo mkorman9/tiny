@@ -33,8 +33,10 @@ func DialPostgres(opts ...Opt) (*Client, error) {
 	}
 
 	gormConfig := &gorm.Config{
-		Logger:      &gormLogger{verbose: config.Verbose},
-		NowFunc:     time.Now().UTC,
+		Logger: &gormLogger{verbose: config.Verbose},
+		NowFunc: func() time.Time {
+			return time.Now().UTC()
+		},
 		QueryFields: true,
 	}
 

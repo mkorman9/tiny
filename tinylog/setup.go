@@ -61,7 +61,9 @@ func configureLevel(config *Config) {
 }
 
 func configureSettings() {
-	zerolog.TimestampFunc = time.Now().UTC
+	zerolog.TimestampFunc = func() time.Time {
+		return time.Now().UTC()
+	}
 	zerolog.TimestampFieldName = "time"
 	zerolog.DurationFieldUnit = time.Millisecond
 	zerolog.DurationFieldInteger = true
