@@ -21,7 +21,7 @@ func TestMissingToken(t *testing.T) {
 
 	middleware := createBearerTokenMiddleware(correctToken)
 
-	engine := tinyhttp.NewServer().Engine
+	engine := tinyhttp.NewServer("address").Engine
 	engine.GET(
 		"/secured",
 		middleware.AnyOfRoles("ADMIN"),
@@ -46,7 +46,7 @@ func TestInvalidToken(t *testing.T) {
 
 	middleware := createBearerTokenMiddleware(correctToken)
 
-	engine := tinyhttp.NewServer().Engine
+	engine := tinyhttp.NewServer("address").Engine
 	engine.GET(
 		"/secured",
 		middleware.AnyOfRoles("ADMIN"),
@@ -72,7 +72,7 @@ func TestValidToken(t *testing.T) {
 
 	middleware := createBearerTokenMiddleware(correctToken)
 
-	engine := tinyhttp.NewServer().Engine
+	engine := tinyhttp.NewServer("address").Engine
 	engine.GET(
 		"/secured",
 		middleware.AnyOfRoles("ADMIN"),
@@ -99,7 +99,7 @@ func TestInvalidRoles(t *testing.T) {
 
 	middleware := createBearerTokenMiddleware(correctToken)
 
-	engine := tinyhttp.NewServer().Engine
+	engine := tinyhttp.NewServer("address").Engine
 	engine.GET(
 		"/secured",
 		middleware.AnyOfRoles("SUPERUSER"),

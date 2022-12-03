@@ -17,7 +17,7 @@ func TestHTTPServer(t *testing.T) {
 	// given
 	responsePayload := "payload"
 
-	engine := NewServer().Engine
+	engine := NewServer("address").Engine
 	engine.GET("/test", func(c *gin.Context) {
 		c.String(http.StatusOK, responsePayload)
 	})
