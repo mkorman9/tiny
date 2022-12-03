@@ -2,6 +2,7 @@ package tinypostgres
 
 import (
 	"errors"
+	"github.com/mkorman9/tiny/gormcommon"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -15,7 +16,7 @@ type Client struct {
 }
 
 // DialPostgres creates a connection to Postgres, and returns Client instance.
-func DialPostgres(opts ...Opt) (*Client, error) {
+func DialPostgres(url string, opts ...Opt) (*Client, error) {
 	config := Config{
 		Verbose:         false,
 		PoolMaxOpen:     10,
@@ -28,12 +29,12 @@ func DialPostgres(opts ...Opt) (*Client, error) {
 		opt(&config)
 	}
 
-	if config.URL == "" {
+	if url == "" {
 		return nil, errors.New("URL cannot be empty")
 	}
 
 	gormConfig := &gorm.Config{
-		Logger: &gormLogger{verbose: config.Verbose},
+		Logger: &gormcommon.GormLogger{Verbose: config.Verbose},
 		NowFunc: func() time.Time {
 			return time.Now().UTC()
 		},
@@ -46,7 +47,7 @@ func DialPostgres(opts ...Opt) (*Client, error) {
 
 	log.Debug().Msg("Establishing Postgres connection")
 
-	db, err := gorm.Open(postgres.Open(config.URL), gormConfig)
+	db, err := gorm.Open(postgres.Open(url), gormConfig)
 	if err == nil {
 		sqlDB, err := db.DB()
 		if err != nil {

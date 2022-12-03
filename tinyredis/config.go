@@ -7,9 +7,6 @@ import (
 
 // Config holds a configuration for Client.
 type Config struct {
-	// Address is a remote host and port to connect to.
-	Address string
-
 	// Username is an optional property used in authorization.
 	Username string
 
@@ -28,13 +25,6 @@ type Config struct {
 
 // Opt is an option to be specified to DialRedis.
 type Opt = func(*Config)
-
-// Address is a remote host and port to connect to.
-func Address(address string) Opt {
-	return func(config *Config) {
-		config.Address = address
-	}
-}
 
 // Username is an optional property used in authorization.
 func Username(username string) Opt {

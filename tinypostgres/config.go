@@ -7,9 +7,6 @@ import (
 
 // Config holds a configuration for Client.
 type Config struct {
-	// URL is a string that contains basic connection data.
-	URL string
-
 	// Verbose specifies whether to log all executed queries.
 	Verbose bool
 
@@ -30,13 +27,6 @@ type Config struct {
 
 // Opt is an option to be specified to DialPostgres.
 type Opt = func(*Config)
-
-// URL is a string that contains basic connection data.
-func URL(url string) Opt {
-	return func(config *Config) {
-		config.URL = url
-	}
-}
 
 // Verbose specifies whether to log all executed queries.
 func Verbose(verbose bool) Opt {

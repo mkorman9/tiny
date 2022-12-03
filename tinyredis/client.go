@@ -14,7 +14,7 @@ type Client struct {
 }
 
 // DialRedis creates a connection to Redis and returns Client instance.
-func DialRedis(opts ...Opt) (*Client, error) {
+func DialRedis(address string, opts ...Opt) (*Client, error) {
 	config := Config{
 		ConnectionTimeout: 5 * time.Second,
 	}
@@ -23,12 +23,12 @@ func DialRedis(opts ...Opt) (*Client, error) {
 		opt(&config)
 	}
 
-	if config.Address == "" {
-		return nil, errors.New("redis address cannot be empty")
+	if address == "" {
+		return nil, errors.New("address cannot be empty")
 	}
 
 	client := redis.NewClient(&redis.Options{
-		Addr:      config.Address,
+		Addr:      address,
 		Username:  config.Username,
 		Password:  config.Password,
 		DB:        config.DB,

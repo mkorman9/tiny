@@ -1,6 +1,9 @@
 # tiny
 
-tiny is a Go library for rapid prototyping backend applications.
+tiny is a Go library for rapid prototyping backend applications. It's basically a wrapper around popular Go libraries.
+It provides a common interface for starting various network servers, such as TCP, HTTP or gRPC and handling connections
+to databases, such as Postgres, sqlite or redis. Dependencies containing references to CGO are intentionally avoided
+and Pure-Go implementations are selected instead.
 
 ## Install
 ```bash
@@ -17,6 +20,7 @@ import (
 	"github.com/gookit/config/v2"
 	"github.com/mkorman9/tiny"
 	"github.com/mkorman9/tiny/tinyhttp"
+	"github.com/mkorman9/tiny/tinytcp"
 )
 
 func main() {
@@ -33,6 +37,17 @@ func main() {
 		})
 	})
 
-	tiny.StartAndBlock(httpServer)
+	tcpServer := tinytcp.NewServer(
+		tinytcp.Address(config.String("tcp.address", "0.0.0.0:7000")),
+	)
+
+	tcpServer.ForkingStrategy(tinytcp.GoroutinePerConnection(
+		func(socket *tinytcp.ClientSocket) {
+			socket.Write([]byte("Hello world!"))
+			socket.Close()
+        },
+	))
+	
+	tiny.StartAndBlock(httpServer, tcpServer)
 }
 ```
