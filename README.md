@@ -21,6 +21,7 @@ import (
 	"github.com/mkorman9/tiny"
 	"github.com/mkorman9/tiny/tinyhttp"
 	"github.com/mkorman9/tiny/tinytcp"
+	"net/http"
 )
 
 func main() {
@@ -28,7 +29,7 @@ func main() {
 	tiny.SetupLogger()
 
 	httpServer := tinyhttp.NewServer(
-		tinyhttp.Address(config.String("http.address", "0.0.0.0:8080")),
+		config.String("http.address", "0.0.0.0:8080"),
 	)
 
 	httpServer.GET("/", func(c *gin.Context) {
@@ -38,7 +39,7 @@ func main() {
 	})
 
 	tcpServer := tinytcp.NewServer(
-		tinytcp.Address(config.String("tcp.address", "0.0.0.0:7000")),
+		config.String("tcp.address", "0.0.0.0:7000"),
 	)
 
 	tcpServer.ForkingStrategy(tinytcp.GoroutinePerConnection(

@@ -14,10 +14,8 @@ type Server struct {
 }
 
 // NewServer create new Server using global configuration and provided options.
-func NewServer(opts ...ServerOpt) *Server {
-	serverConfig := ServerConfig{
-		address: "0.0.0.0:9000",
-	}
+func NewServer(address string, opts ...ServerOpt) *Server {
+	serverConfig := ServerConfig{}
 
 	for _, opt := range opts {
 		opt(&serverConfig)
@@ -35,7 +33,7 @@ func NewServer(opts ...ServerOpt) *Server {
 
 	return &Server{
 		Server:  grpc.NewServer(grpcOptions...),
-		address: serverConfig.address,
+		address: address,
 	}
 }
 

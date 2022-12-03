@@ -5,7 +5,6 @@ import (
 	"github.com/mkorman9/tiny/gormcommon"
 	"time"
 
-	"github.com/rs/zerolog/log"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -45,8 +44,6 @@ func DialPostgres(url string, opts ...Opt) (*Client, error) {
 		opt(gormConfig)
 	}
 
-	log.Debug().Msg("Establishing Postgres connection")
-
 	db, err := gorm.Open(postgres.Open(url), gormConfig)
 	if err == nil {
 		sqlDB, err := db.DB()
@@ -58,26 +55,17 @@ func DialPostgres(url string, opts ...Opt) (*Client, error) {
 		sqlDB.SetMaxIdleConns(config.PoolMaxIdle)
 		sqlDB.SetConnMaxLifetime(config.PoolMaxLifetime)
 		sqlDB.SetConnMaxIdleTime(config.PoolMaxIdleTime)
-
-		log.Info().Msg("Successfully connected to Postgres")
 	}
 
 	return &Client{DB: db}, err
 }
 
 // Close closes a connection to Postgres.
-func (c *Client) Close() {
-	log.Debug().Msg("Closing Postgres connection")
-
+func (c *Client) Close() error {
 	sqlDB, err := c.DB.DB()
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to acquire *sql.DB reference when closing Postgres connection")
-		return
+		return err
 	}
 
-	if err := sqlDB.Close(); err != nil {
-		log.Error().Err(err).Msg("Error when closing Postgres connection")
-	} else {
-		log.Info().Msg("Postgres connection closed successfully")
-	}
+	return sqlDB.Close()
 }

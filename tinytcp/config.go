@@ -18,8 +18,7 @@ const (
 
 // ServerConfig holds a configuration for NewServer.
 type ServerConfig struct {
-	// Address is an address to bind server socket to (default: "0.0.0.0:7000").
-	Address string
+	address string
 
 	// Mode is a mode in which the server starts listening - IPv4_Only, IPv6_Only or Both (default: Both).
 	Mode ListenMode
@@ -39,13 +38,6 @@ type ServerConfig struct {
 
 // ServerOpt is an option to be specified to NewServer.
 type ServerOpt func(*ServerConfig)
-
-// Address is an address to bind server socket to.
-func Address(address string) ServerOpt {
-	return func(config *ServerConfig) {
-		config.Address = address
-	}
-}
 
 // Mode is a mode in which the server starts listening - IPv4_Only, IPv6_Only or Both.
 func Mode(mode ListenMode) ServerOpt {

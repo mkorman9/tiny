@@ -4,7 +4,6 @@ import (
 	"errors"
 	"github.com/glebarez/sqlite"
 	"github.com/mkorman9/tiny/gormcommon"
-	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
 	"time"
 )
@@ -48,15 +47,12 @@ func Open(dsn string, opts ...Opt) (*Client, error) {
 	return &Client{DB: db}, err
 }
 
-// Close closes a connection to Postgres.
-func (c *Client) Close() {
+// Close closes the underlying sqlite database.
+func (c *Client) Close() error {
 	sqlDB, err := c.DB.DB()
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to acquire *sql.DB reference when closing sqlite database")
-		return
+		return err
 	}
 
-	if err := sqlDB.Close(); err != nil {
-		log.Error().Err(err).Msg("Error when closing sqlite database")
-	}
+	return sqlDB.Close()
 }

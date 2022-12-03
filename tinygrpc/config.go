@@ -6,7 +6,6 @@ import (
 
 // ServerConfig holds a configuration for NewServer.
 type ServerConfig struct {
-	address            string
 	grpcOptions        []grpc.ServerOption
 	unaryInterceptors  []grpc.UnaryServerInterceptor
 	streamInterceptors []grpc.StreamServerInterceptor
@@ -14,13 +13,6 @@ type ServerConfig struct {
 
 // ServerOpt is an option to be specified to NewServer.
 type ServerOpt = func(*ServerConfig)
-
-// Address is an address to bind to (default: "0.0.0.0:9000").
-func Address(address string) ServerOpt {
-	return func(serverConfig *ServerConfig) {
-		serverConfig.address = address
-	}
-}
 
 // ServerOptions allows to specify custom grpc.ServerOption options.
 func ServerOptions(opts ...grpc.ServerOption) ServerOpt {

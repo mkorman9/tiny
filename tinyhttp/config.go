@@ -7,8 +7,7 @@ import (
 
 // ServerConfig holds a configuration for NewServer.
 type ServerConfig struct {
-	// Address is an address to bind server socket to (default: "0.0.0.0:8080").
-	Address string
+	address string
 
 	// Network is a network type for the listener (default: "tcp").
 	Network string
@@ -54,13 +53,6 @@ type ServerConfig struct {
 
 // ServerOpt is an option to be specified to NewServer.
 type ServerOpt = func(*ServerConfig)
-
-// Address is an address to bind server socket to.
-func Address(address string) ServerOpt {
-	return func(config *ServerConfig) {
-		config.Address = address
-	}
-}
 
 // Network is a network type for the listener.
 func Network(network string) ServerOpt {

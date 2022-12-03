@@ -25,9 +25,9 @@ type Server struct {
 }
 
 // NewServer creates new Server instance.
-func NewServer(opts ...ServerOpt) *Server {
+func NewServer(address string, opts ...ServerOpt) *Server {
 	config := ServerConfig{
-		Address:         "0.0.0.0:8080",
+		address:         address,
 		Network:         "tcp",
 		SecurityHeaders: true,
 		ShutdownTimeout: 5 * time.Second,
@@ -60,7 +60,7 @@ func NewServer(opts ...ServerOpt) *Server {
 
 // Start implements the interface of tiny.Service.
 func (server *Server) Start() error {
-	log.Info().Msgf("HTTP server started (%s)", server.config.Address)
+	log.Info().Msgf("HTTP server started (%s)", server.config.address)
 
 	httpServer := &http.Server{
 		Handler:           server.Engine,
@@ -76,7 +76,7 @@ func (server *Server) Start() error {
 	server.httpServer = httpServer
 	server.httpServerLock.Unlock()
 
-	l, err := net.Listen(server.config.Network, server.config.Address)
+	l, err := net.Listen(server.config.Network, server.config.address)
 	if err != nil {
 		return err
 	}
@@ -111,9 +111,9 @@ func (server *Server) Stop() {
 
 	err := server.httpServer.Shutdown(ctx)
 	if err != nil {
-		log.Error().Err(err).Msgf("Error shutting down HTTP server (%s)", server.config.Address)
+		log.Error().Err(err).Msgf("Error shutting down HTTP server (%s)", server.config.address)
 	} else {
-		log.Info().Msgf("HTTP server stopped (%s)", server.config.Address)
+		log.Info().Msgf("HTTP server stopped (%s)", server.config.address)
 	}
 }
 

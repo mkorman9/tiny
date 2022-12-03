@@ -17,7 +17,6 @@ import (
 // RequestConfig holds a configuration for request while it's constructed.
 type RequestConfig struct {
 	method  string
-	url     string
 	body    io.Reader
 	headers map[string]string
 	host    string
@@ -36,7 +35,7 @@ type RequestPart struct {
 }
 
 // NewRequest constructs a request using given options.
-func NewRequest(opts ...RequestOpt) (*http.Request, error) {
+func NewRequest(url string, opts ...RequestOpt) (*http.Request, error) {
 	config := &RequestConfig{
 		method:  "GET",
 		headers: map[string]string{},
@@ -48,7 +47,7 @@ func NewRequest(opts ...RequestOpt) (*http.Request, error) {
 		}
 	}
 
-	request, err := http.NewRequest(config.method, config.url, config.body)
+	request, err := http.NewRequest(config.method, url, config.body)
 	if err != nil {
 		return nil, err
 	}
@@ -83,14 +82,6 @@ var (
 func Method(method string) RequestOpt {
 	return func(config *RequestConfig) error {
 		config.method = method
-		return nil
-	}
-}
-
-// URL is a target URL of the HTTP request.
-func URL(url string) RequestOpt {
-	return func(config *RequestConfig) error {
-		config.url = url
 		return nil
 	}
 }

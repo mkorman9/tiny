@@ -26,9 +26,9 @@ type Server struct {
 }
 
 // NewServer returns new Server instance.
-func NewServer(opts ...ServerOpt) *Server {
+func NewServer(address string, opts ...ServerOpt) *Server {
 	config := &ServerConfig{
-		Address:    "0.0.0.0:7000",
+		address:    address,
 		Mode:       Both,
 		MaxClients: -1,
 		TLSConfig: &tls.Config{
@@ -81,14 +81,14 @@ func (s *Server) Start() error {
 		s.config.TLSConfig.Certificates = []tls.Certificate{cert}
 
 		var socket net.Listener
-		socket, err = tls.Listen(listenMode, s.config.Address, s.config.TLSConfig)
+		socket, err = tls.Listen(listenMode, s.config.address, s.config.TLSConfig)
 		if err != nil {
 			return err
 		}
 
 		s.listener = socket
 	} else {
-		socket, err := net.Listen(listenMode, s.config.Address)
+		socket, err := net.Listen(listenMode, s.config.address)
 		if err != nil {
 			return err
 		}
@@ -96,7 +96,7 @@ func (s *Server) Start() error {
 		s.listener = socket
 	}
 
-	log.Info().Msgf("TCP server started (%s)", s.config.Address)
+	log.Info().Msgf("TCP server started (%s)", s.config.address)
 	go s.startBackgroundJob()
 	s.forkingStrategy.OnStart()
 
@@ -125,7 +125,7 @@ func (s *Server) Stop() {
 	}
 
 	if err := s.listener.Close(); err != nil {
-		log.Error().Err(err).Msgf("Error shutting down TCP server (%s)", s.config.Address)
+		log.Error().Err(err).Msgf("Error shutting down TCP server (%s)", s.config.address)
 	}
 
 	if s.ticker != nil {
@@ -139,7 +139,7 @@ func (s *Server) Stop() {
 
 	s.forkingStrategy.OnStop()
 
-	log.Info().Msgf("TCP server stopped (%s)", s.config.Address)
+	log.Info().Msgf("TCP server stopped (%s)", s.config.address)
 }
 
 // Sockets returns a list of all client sockets currently connected.
