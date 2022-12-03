@@ -46,7 +46,7 @@ func main() {
 		func(socket *tinytcp.ClientSocket) {
 			socket.Write([]byte("Hello world!"))
 			socket.Close()
-        },
+		},
 	))
 	
 	tiny.StartAndBlock(httpServer, tcpServer)
