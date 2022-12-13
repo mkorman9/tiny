@@ -14,8 +14,8 @@ type Client struct {
 	*gorm.DB
 }
 
-// DialPostgres creates a connection to Postgres, and returns Client instance.
-func DialPostgres(url string, opts ...Opt) (*Client, error) {
+// Dial creates a connection to Postgres, and returns Client instance.
+func Dial(url string, opts ...Opt) (*Client, error) {
 	config := Config{
 		Verbose:         false,
 		PoolMaxOpen:     10,

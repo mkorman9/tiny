@@ -25,7 +25,7 @@ type Config struct {
 	gormOpts []func(*gorm.Config)
 }
 
-// Opt is an option to be specified to DialPostgres.
+// Opt is an option to be specified to Dial.
 type Opt = func(*Config)
 
 // Verbose specifies whether to log all executed queries.

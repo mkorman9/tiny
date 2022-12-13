@@ -4,17 +4,11 @@ import (
 	"context"
 	"errors"
 	"github.com/go-redis/redis/v8"
-	"github.com/rs/zerolog/log"
 	"time"
 )
 
-// Client is a wrapper for *redis.Client providing a handy Close() function.
-type Client struct {
-	*redis.Client
-}
-
-// DialRedis creates a connection to Redis and returns Client instance.
-func DialRedis(address string, opts ...Opt) (*Client, error) {
+// Dial creates a connection to Redis and returns *redis.Client instance.
+func Dial(address string, opts ...Opt) (*redis.Client, error) {
 	config := Config{
 		ConnectionTimeout: 5 * time.Second,
 	}
@@ -35,27 +29,14 @@ func DialRedis(address string, opts ...Opt) (*Client, error) {
 		TLSConfig: config.TLSConfig,
 	})
 
-	log.Debug().Msg("Establishing Redis connection")
+	if !config.NoPing {
+		ctx, cancel := context.WithTimeout(context.Background(), config.ConnectionTimeout)
+		defer cancel()
 
-	ctx, cancel := context.WithTimeout(context.Background(), config.ConnectionTimeout)
-	defer cancel()
-
-	if err := client.Ping(ctx).Err(); err != nil {
-		return nil, err
-	} else {
-		log.Info().Msg("Successfully connected to Redis")
+		if err := client.Ping(ctx).Err(); err != nil {
+			return nil, err
+		}
 	}
 
-	return &Client{Client: client}, nil
-}
-
-// Close closes a connection to Redis.
-func (c *Client) Close() {
-	log.Debug().Msg("Closing Redis connection")
-
-	if err := c.Client.Close(); err != nil {
-		log.Error().Err(err).Msg("Error when closing Redis connection")
-	} else {
-		log.Info().Msg("Redis connection closed successfully")
-	}
+	return client, nil
 }
