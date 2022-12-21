@@ -7,7 +7,7 @@ import (
 
 func TestSmokeTest(t *testing.T) {
 	SetupLogger()
-	err := LoadConfig()
+	loaded := LoadConfig()
 
-	assert.Nil(t, err, "config should be loaded successfully")
+	assert.True(t, loaded, "config should be loaded successfully")
 }
