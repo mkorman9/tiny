@@ -25,7 +25,7 @@ import (
 )
 
 func main() {
-	_ = tiny.LoadConfig()
+	tiny.LoadConfig()
 	tiny.SetupLogger()
 
 	httpServer := tinyhttp.NewServer(
