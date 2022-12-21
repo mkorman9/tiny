@@ -5,6 +5,7 @@ import (
 	"github.com/gookit/config/v2/hcl"
 	"github.com/gookit/config/v2/json"
 	"github.com/gookit/config/v2/yamlv3"
+	"github.com/rs/zerolog/log"
 	"os"
 	"strings"
 )
@@ -12,7 +13,9 @@ import (
 // LoadConfig loads configuration from environment variables and optionally from the specified list of files.
 // YAML, JSON and HCL file formats are supported.
 // Configuration is stored into global config.Config instance.
-func LoadConfig(files ...string) error {
+func LoadConfig(files ...string) (loaded bool) {
+	loaded = true
+
 	if len(files) > 0 {
 		config.AddDriver(yamlv3.Driver)
 		config.AddDriver(json.Driver)
@@ -20,7 +23,8 @@ func LoadConfig(files ...string) error {
 
 		err := config.LoadFiles(files...)
 		if err != nil {
-			return err
+			log.Warn().Err(err).Msg("Failed to load configuration files")
+			loaded = false
 		}
 	}
 
@@ -33,8 +37,7 @@ func LoadConfig(files ...string) error {
 	}
 
 	config.LoadOSEnvs(envs)
-
-	return nil
+	return
 }
 
 func envNameToConfigKey(envName string) string {
