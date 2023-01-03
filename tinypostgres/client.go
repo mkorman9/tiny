@@ -9,13 +9,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// Client is a wrapper for *gorm.DB providing a handy Close() function.
-type Client struct {
-	*gorm.DB
-}
-
-// Dial creates a connection to Postgres, and returns Client instance.
-func Dial(url string, opts ...Opt) (*Client, error) {
+// Dial creates a connection to Postgres, and returns *gorm.DB instance.
+func Dial(url string, opts ...Opt) (*gorm.DB, error) {
 	config := Config{
 		Verbose:         false,
 		PoolMaxOpen:     10,
@@ -57,15 +52,5 @@ func Dial(url string, opts ...Opt) (*Client, error) {
 		sqlDB.SetConnMaxIdleTime(config.PoolMaxIdleTime)
 	}
 
-	return &Client{DB: db}, err
-}
-
-// Close closes a connection to Postgres.
-func (c *Client) Close() error {
-	sqlDB, err := c.DB.DB()
-	if err != nil {
-		return err
-	}
-
-	return sqlDB.Close()
+	return db, err
 }

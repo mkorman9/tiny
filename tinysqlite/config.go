@@ -4,7 +4,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Config holds a configuration for Client.
+// Config holds a configuration for Open.
 type Config struct {
 	// Verbose specifies whether to log all executed queries.
 	Verbose bool

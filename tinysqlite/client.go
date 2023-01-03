@@ -8,13 +8,8 @@ import (
 	"time"
 )
 
-// Client is a wrapper for *gorm.DB providing a handy Close() function.
-type Client struct {
-	*gorm.DB
-}
-
-// Open tries to open an instance of sqlite3 database and then return Client instance to interact with it.
-func Open(dsn string, opts ...Opt) (*Client, error) {
+// Open tries to open an instance of sqlite3 database and then return *gorm.DB instance to interact with it.
+func Open(dsn string, opts ...Opt) (*gorm.DB, error) {
 	config := Config{
 		Verbose: false,
 	}
@@ -44,15 +39,5 @@ func Open(dsn string, opts ...Opt) (*Client, error) {
 		return nil, err
 	}
 
-	return &Client{DB: db}, err
-}
-
-// Close closes the underlying sqlite database.
-func (c *Client) Close() error {
-	sqlDB, err := c.DB.DB()
-	if err != nil {
-		return err
-	}
-
-	return sqlDB.Close()
+	return db, err
 }

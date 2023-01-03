@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Config holds a configuration for Client.
+// Config holds a configuration for Dial.
 type Config struct {
 	// Verbose specifies whether to log all executed queries.
 	Verbose bool
