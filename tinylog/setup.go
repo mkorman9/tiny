@@ -20,7 +20,7 @@ var defaultOutput = os.Stderr
 // Default configuration can be overwritten by providing custom options as arguments.
 func SetupLogger(opts ...Opt) {
 	config := &Config{
-		Level:      zerolog.LevelInfoValue,
+		Level:      zerolog.InfoLevel,
 		TimeFormat: "2006-01-02 15:04:05",
 		Console: ConsoleConfig{
 			Enabled: true,
@@ -45,22 +45,13 @@ func SetupLogger(opts ...Opt) {
 		opt(config)
 	}
 
-	configureLevel(config)
-	configureSettings()
+	configureSettings(config)
 	_ = configureWriters(config)
 	configureFields(config)
 }
 
-func configureLevel(config *Config) {
-	level, err := zerolog.ParseLevel(config.Level)
-	if err != nil {
-		zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	} else {
-		zerolog.SetGlobalLevel(level)
-	}
-}
-
-func configureSettings() {
+func configureSettings(config *Config) {
+	zerolog.SetGlobalLevel(config.Level)
 	zerolog.TimestampFunc = func() time.Time {
 		return time.Now().UTC()
 	}

@@ -1,6 +1,7 @@
 package tinylog
 
 import (
+	"github.com/rs/zerolog"
 	"io"
 	"os"
 )
@@ -18,8 +19,8 @@ const (
 
 // Config represents a configuration of the global logger.
 type Config struct {
-	// Level is a log level to enable (default: "info").
-	Level string
+	// Level is a log level to enable (default: InfoLevel).
+	Level zerolog.Level
 
 	// TimeFormat specifies time format to use (default: "2006-01-02 15:04:05")
 	TimeFormat string
@@ -84,7 +85,10 @@ type Opt func(*Config)
 // Level sets logging level to enable.
 func Level(level string) Opt {
 	return func(config *Config) {
-		config.Level = level
+		levelParsed, err := zerolog.ParseLevel(level)
+		if err == nil {
+			config.Level = levelParsed
+		}
 	}
 }
 
