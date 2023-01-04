@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	tiny.SetupLogger()
+	tiny.Init()
 }
 
 func TestMissingToken(t *testing.T) {

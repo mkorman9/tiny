@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	tiny.SetupLogger()
+	tiny.Init()
 }
 
 func TestHTTPServer(t *testing.T) {
