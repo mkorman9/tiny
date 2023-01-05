@@ -92,6 +92,41 @@ func Level(level string) Opt {
 	}
 }
 
+// LevelDebug sets logging level to DebugLevel
+func LevelDebug() Opt {
+	return func(config *Config) {
+		config.Level = zerolog.DebugLevel
+	}
+}
+
+// LevelInfo sets logging level to InfoLevel
+func LevelInfo() Opt {
+	return func(config *Config) {
+		config.Level = zerolog.InfoLevel
+	}
+}
+
+// LevelWarn sets logging level to WarnLevel
+func LevelWarn() Opt {
+	return func(config *Config) {
+		config.Level = zerolog.WarnLevel
+	}
+}
+
+// LevelError sets logging level to ErrorLevel
+func LevelError() Opt {
+	return func(config *Config) {
+		config.Level = zerolog.ErrorLevel
+	}
+}
+
+// LevelFatal sets logging level to FatalLevel
+func LevelFatal() Opt {
+	return func(config *Config) {
+		config.Level = zerolog.FatalLevel
+	}
+}
+
 // TimeFormat specifies time format to use
 func TimeFormat(format string) Opt {
 	return func(config *Config) {

@@ -28,10 +28,10 @@ type Config struct {
 // Opt is an option to be specified to Dial.
 type Opt = func(*Config)
 
-// Verbose specifies whether to log all executed queries.
-func Verbose(verbose bool) Opt {
+// Verbose tells client to log all executed queries.
+func Verbose() Opt {
 	return func(config *Config) {
-		config.Verbose = verbose
+		config.Verbose = true
 	}
 }
 
