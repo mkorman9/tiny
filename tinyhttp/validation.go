@@ -9,8 +9,11 @@ import (
 
 // ValidationError denotes an error in payload validation.
 type ValidationError struct {
-	Field string
-	Tag   string
+	// Field is a name of the field that contains an error.
+	Field string `json:"field"`
+
+	// Tag is a name of the tag that trigger an error.
+	Tag string `json:"tag"`
 }
 
 // ExtractValidatorErrors tries to extract an array of ValidationError from given error.
