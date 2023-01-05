@@ -60,7 +60,10 @@ func StartAndBlock(services ...Service) {
 			go func() {
 				defer func() {
 					if r := recover(); r != nil {
-						log.Error().Err(fmt.Errorf("%v", r)).Msg("Panic while stopping service")
+						log.Error().
+							Stack().
+							Err(fmt.Errorf("%v", r)).
+							Msg("Panic while stopping service")
 					}
 
 					wg.Done()
