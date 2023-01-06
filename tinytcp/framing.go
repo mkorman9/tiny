@@ -3,6 +3,7 @@ package tinytcp
 import (
 	"bytes"
 	"encoding/binary"
+	"sync"
 )
 
 // PacketHandler is a function to be called after receiving packet data.
@@ -46,16 +47,36 @@ func PacketFramingHandler(
 	maxPacketSize int,
 	handler func(ctx PacketFramingContext),
 ) ClientSocketHandler {
-	return func(client *ClientSocket) {
-		ctx := packetFramingContext{
-			socket: client,
+	var (
+		readBufferPool = sync.Pool{
+			New: func() any {
+				return make([]byte, readBufferSize)
+			},
 		}
-		handler(&ctx)
+		packetFramingContextPool = sync.Pool{
+			New: func() any {
+				return &packetFramingContext{}
+			},
+		}
+	)
+
+	return func(client *ClientSocket) {
+		ctx := packetFramingContextPool.Get().(*packetFramingContext)
+		ctx.socket = client
+		handler(ctx)
 
 		var (
 			accumulator []byte
-			readBuffer  = make([]byte, readBufferSize)
+			readBuffer  = readBufferPool.Get().([]byte)
 		)
+
+		defer func() {
+			readBufferPool.Put(readBuffer)
+
+			ctx.socket = nil
+			ctx.handler = nil
+			packetFramingContextPool.Put(ctx)
+		}()
 
 		for {
 			bytesRead, err := client.Read(readBuffer)
@@ -67,14 +88,14 @@ func PacketFramingHandler(
 				continue
 			}
 
-			readBuffer = readBuffer[:bytesRead]
+			buffer := readBuffer[:bytesRead]
 
-			if len(accumulator)+len(readBuffer) > maxPacketSize {
+			if len(accumulator)+len(buffer) > maxPacketSize {
 				accumulator = nil
 				continue
 			}
 
-			accumulator = bytes.Join([][]byte{accumulator, readBuffer}, nil)
+			accumulator = bytes.Join([][]byte{accumulator, buffer}, nil)
 
 			for {
 				packetData, newAccumulator, ok := framingProtocol.ExtractPacket(accumulator)
