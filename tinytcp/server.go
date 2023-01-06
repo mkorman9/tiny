@@ -191,6 +191,7 @@ func (s *Server) handleNewConnection(connection net.Conn) {
 	if added := s.addClientSocket(clientSocket); !added {
 		// instantly terminate the connection if it can't be added to the server pool
 		_ = clientSocket.connection.Close()
+		s.recycleClientSocket(clientSocket)
 		return
 	}
 
