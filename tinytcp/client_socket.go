@@ -29,22 +29,18 @@ type ClientSocket struct {
 // ClientSocketHandler represents a signature of function used by Server to handle new connections.
 type ClientSocketHandler func(*ClientSocket)
 
-func newClientSocket(connection net.Conn, id int64) *ClientSocket {
-	reader := &byteCountingReader{reader: connection}
-	writer := &byteCountingWriter{writer: connection}
-
-	cs := &ClientSocket{
-		id:                 id,
-		remoteAddress:      parseRemoteAddress(connection),
-		connectedAt:        time.Now(),
-		connection:         connection,
-		reader:             reader,
-		writer:             writer,
-		byteCountingReader: reader,
-		byteCountingWriter: writer,
-	}
-
-	return cs
+func (cs *ClientSocket) reset() {
+	cs.id = 0
+	cs.remoteAddress = ""
+	cs.connection = nil
+	cs.reader = nil
+	cs.writer = nil
+	cs.byteCountingReader = nil
+	cs.byteCountingWriter = nil
+	cs.isClosed = 0
+	cs.closeOnce = sync.Once{}
+	cs.closeHandlers = nil
+	cs.closeHandlersMutex = sync.RWMutex{}
 }
 
 // Id returns a unique id associated with this socket.

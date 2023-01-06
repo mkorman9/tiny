@@ -14,15 +14,18 @@ import (
 
 // Server represents a TCP server, and conforms to the tiny.Service interface.
 type Server struct {
-	config               *ServerConfig
-	listener             net.Listener
-	forkingStrategy      ForkingStrategy
-	sockets              []*ClientSocket
-	socketsMutex         sync.RWMutex
-	ticker               *time.Ticker
-	metrics              ServerMetrics
-	metricsUpdateHandler func()
-	idRand               *mathrand.Rand
+	config                 *ServerConfig
+	listener               net.Listener
+	forkingStrategy        ForkingStrategy
+	sockets                []*ClientSocket
+	socketsMutex           sync.RWMutex
+	ticker                 *time.Ticker
+	metrics                ServerMetrics
+	metricsUpdateHandler   func()
+	idRand                 *mathrand.Rand
+	clientSocketPool       sync.Pool
+	byteCountingReaderPool sync.Pool
+	byteCountingWriterPool sync.Pool
 }
 
 // NewServer returns new Server instance.
@@ -43,6 +46,21 @@ func NewServer(address string, opts ...ServerOpt) *Server {
 	return &Server{
 		config: config,
 		idRand: mathrand.New(mathrand.NewSource(time.Now().Unix())),
+		clientSocketPool: sync.Pool{
+			New: func() any {
+				return &ClientSocket{}
+			},
+		},
+		byteCountingReaderPool: sync.Pool{
+			New: func() any {
+				return &byteCountingReader{}
+			},
+		},
+		byteCountingWriterPool: sync.Pool{
+			New: func() any {
+				return &byteCountingWriter{}
+			},
+		},
 	}
 }
 
@@ -168,7 +186,7 @@ func (s *Server) OnMetricsUpdate(handler func()) {
 }
 
 func (s *Server) handleNewConnection(connection net.Conn) {
-	clientSocket := newClientSocket(connection, s.idRand.Int63())
+	clientSocket := s.newClientSocket(connection, s.idRand.Int63())
 
 	if added := s.addClientSocket(clientSocket); !added {
 		// instantly terminate the connection if it can't be added to the server pool
@@ -179,6 +197,25 @@ func (s *Server) handleNewConnection(connection net.Conn) {
 	log.Debug().Msgf("Opening TCP client connection #%d (%s)", clientSocket.Id(), clientSocket.RemoteAddress())
 
 	s.forkingStrategy.OnAccept(clientSocket)
+}
+
+func (s *Server) newClientSocket(connection net.Conn, id int64) *ClientSocket {
+	reader := s.byteCountingReaderPool.Get().(*byteCountingReader)
+	reader.reader = connection
+
+	writer := s.byteCountingWriterPool.Get().(*byteCountingWriter)
+	writer.writer = connection
+
+	cs := s.clientSocketPool.Get().(*ClientSocket)
+	cs.id = id
+	cs.remoteAddress = parseRemoteAddress(connection)
+	cs.connectedAt = time.Now()
+	cs.connection = connection
+	cs.reader = reader
+	cs.writer = writer
+	cs.byteCountingReader = reader
+	cs.byteCountingWriter = writer
+	return cs
 }
 
 func (s *Server) startBackgroundJob() {
@@ -264,11 +301,24 @@ func (s *Server) cleanupClientSockets() {
 	if len(toRemove) > 0 {
 		var sockets []*ClientSocket
 		for _, socket := range s.sockets {
-			if _, ok := toRemove[socket]; !ok {
+			if _, toBeRemoved := toRemove[socket]; toBeRemoved {
+				s.recycleClientSocket(socket)
+			} else {
 				sockets = append(sockets, socket)
 			}
 		}
 
 		s.sockets = sockets
 	}
+}
+
+func (s *Server) recycleClientSocket(clientSocket *ClientSocket) {
+	clientSocket.byteCountingReader.reader = nil
+	s.byteCountingReaderPool.Put(clientSocket.byteCountingReader)
+
+	clientSocket.byteCountingWriter.writer = nil
+	s.byteCountingWriterPool.Put(clientSocket.byteCountingWriter)
+
+	clientSocket.reset()
+	s.clientSocketPool.Put(clientSocket)
 }
