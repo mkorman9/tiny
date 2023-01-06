@@ -315,9 +315,13 @@ func (s *Server) cleanupClientSockets() {
 
 func (s *Server) recycleClientSocket(clientSocket *ClientSocket) {
 	clientSocket.byteCountingReader.reader = nil
+	clientSocket.byteCountingReader.totalBytes = 0
+	clientSocket.byteCountingReader.currentBytes = 0
 	s.byteCountingReaderPool.Put(clientSocket.byteCountingReader)
 
 	clientSocket.byteCountingWriter.writer = nil
+	clientSocket.byteCountingWriter.totalBytes = 0
+	clientSocket.byteCountingWriter.currentBytes = 0
 	s.byteCountingWriterPool.Put(clientSocket.byteCountingWriter)
 
 	clientSocket.reset()
