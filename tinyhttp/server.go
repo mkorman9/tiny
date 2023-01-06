@@ -27,14 +27,16 @@ type Server struct {
 // NewServer creates new Server instance.
 func NewServer(address string, opts ...ServerOpt) *Server {
 	config := ServerConfig{
-		address:         address,
-		Network:         "tcp",
-		SecurityHeaders: true,
-		ShutdownTimeout: 5 * time.Second,
-		TLSConfig:       &tls.Config{},
-		ReadTimeout:     5 * time.Second,
-		WriteTimeout:    10 * time.Second,
-		IdleTimeout:     2 * time.Minute,
+		address:          address,
+		Network:          "tcp",
+		GinMode:          gin.ReleaseMode,
+		SecurityHeaders:  true,
+		MethodNotAllowed: false,
+		ShutdownTimeout:  5 * time.Second,
+		TLSConfig:        &tls.Config{},
+		ReadTimeout:      5 * time.Second,
+		WriteTimeout:     10 * time.Second,
+		IdleTimeout:      2 * time.Minute,
 		TrustedProxies: []string{
 			"10.0.0.0/8",
 			"172.16.0.0/12",
@@ -59,30 +61,30 @@ func NewServer(address string, opts ...ServerOpt) *Server {
 }
 
 // Start implements the interface of tiny.Service.
-func (server *Server) Start() error {
-	log.Info().Msgf("HTTP server started (%s)", server.config.address)
+func (s *Server) Start() error {
+	log.Info().Msgf("HTTP server started (%s)", s.config.address)
 
 	httpServer := &http.Server{
-		Handler:           server.Engine,
-		TLSConfig:         server.config.TLSConfig,
-		ReadTimeout:       server.config.ReadTimeout,
-		ReadHeaderTimeout: server.config.ReadHeaderTimeout,
-		WriteTimeout:      server.config.WriteTimeout,
-		IdleTimeout:       server.config.IdleTimeout,
-		MaxHeaderBytes:    server.config.MaxHeaderBytes,
+		Handler:           s.Engine,
+		TLSConfig:         s.config.TLSConfig,
+		ReadTimeout:       s.config.ReadTimeout,
+		ReadHeaderTimeout: s.config.ReadHeaderTimeout,
+		WriteTimeout:      s.config.WriteTimeout,
+		IdleTimeout:       s.config.IdleTimeout,
+		MaxHeaderBytes:    s.config.MaxHeaderBytes,
 	}
 
-	server.httpServerLock.Lock()
-	server.httpServer = httpServer
-	server.httpServerLock.Unlock()
+	s.httpServerLock.Lock()
+	s.httpServer = httpServer
+	s.httpServerLock.Unlock()
 
-	l, err := net.Listen(server.config.Network, server.config.address)
+	l, err := net.Listen(s.config.Network, s.config.address)
 	if err != nil {
 		return err
 	}
 
-	if server.config.TLSCert != "" && server.config.TLSKey != "" {
-		err = httpServer.ServeTLS(l, server.config.TLSCert, server.config.TLSKey)
+	if s.config.TLSCert != "" && s.config.TLSKey != "" {
+		err = httpServer.ServeTLS(l, s.config.TLSCert, s.config.TLSKey)
 	} else {
 		err = httpServer.Serve(l)
 	}
@@ -95,73 +97,72 @@ func (server *Server) Start() error {
 }
 
 // Stop implements the interface of tiny.Service.
-func (server *Server) Stop() {
-	server.httpServerLock.Lock()
+func (s *Server) Stop() {
+	s.httpServerLock.Lock()
 	defer func() {
-		server.httpServer = nil
-		server.httpServerLock.Unlock()
+		s.httpServer = nil
+		s.httpServerLock.Unlock()
 	}()
 
-	if server.httpServer == nil {
+	if s.httpServer == nil {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), server.config.ShutdownTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), s.config.ShutdownTimeout)
 	defer cancel()
 
-	err := server.httpServer.Shutdown(ctx)
+	err := s.httpServer.Shutdown(ctx)
 	if err != nil {
-		log.Error().Err(err).Msgf("Error shutting down HTTP server (%s)", server.config.address)
+		log.Error().Err(err).Msgf("Error shutting down HTTP server (%s)", s.config.address)
 	} else {
-		log.Info().Msgf("HTTP server stopped (%s)", server.config.address)
+		log.Info().Msgf("HTTP server stopped (%s)", s.config.address)
 	}
 }
 
 // OnNoRoute sets a handler for requests that cannot be routed and would end up as 404s.
-func (server *Server) OnNoRoute(handler func(c *gin.Context)) {
-	server.noRouteHandler = handler
+func (s *Server) OnNoRoute(handler func(c *gin.Context)) {
+	s.noRouteHandler = handler
 }
 
 // OnPanic sets a handler for requests that resulted in panic and would end up as 500s.
-func (server *Server) OnPanic(handler func(c *gin.Context, recovered any)) {
-	server.panicHandler = handler
+func (s *Server) OnPanic(handler func(c *gin.Context, recovered any)) {
+	s.panicHandler = handler
 }
 
-func (server *Server) createEngine() *gin.Engine {
-	gin.SetMode(gin.ReleaseMode)
+func (s *Server) createEngine() *gin.Engine {
+	gin.SetMode(s.config.GinMode)
 
 	engine := gin.New()
-	engine.Use(gin.CustomRecoveryWithWriter(io.Discard, server.recoveryFunction))
+	engine.Use(gin.CustomRecoveryWithWriter(io.Discard, s.recoveryFunction))
 
-	if len(server.config.RemoteIPHeaders) > 0 && len(server.config.TrustedProxies) > 0 {
+	if len(s.config.RemoteIPHeaders) > 0 && len(s.config.TrustedProxies) > 0 {
 		engine.ForwardedByClientIP = true
-		engine.RemoteIPHeaders = server.config.RemoteIPHeaders
-		_ = engine.SetTrustedProxies(server.config.TrustedProxies)
+		engine.RemoteIPHeaders = s.config.RemoteIPHeaders
+		_ = engine.SetTrustedProxies(s.config.TrustedProxies)
 	} else {
 		engine.ForwardedByClientIP = false
 	}
 
-	if server.config.SecurityHeaders {
-		engine.Use(server.securityHeadersFunction)
+	if s.config.SecurityHeaders {
+		engine.Use(s.securityHeadersFunction)
 	}
 
-	engine.HandleMethodNotAllowed = false
-
-	engine.NoRoute(server.noRouteFunction)
+	engine.HandleMethodNotAllowed = s.config.MethodNotAllowed
+	engine.NoRoute(s.noRouteFunction)
 
 	return engine
 }
 
-func (server *Server) noRouteFunction(c *gin.Context) {
-	if server.noRouteHandler != nil {
-		server.noRouteHandler(c)
+func (s *Server) noRouteFunction(c *gin.Context) {
+	if s.noRouteHandler != nil {
+		s.noRouteHandler(c)
 		return
 	}
 
 	c.AbortWithStatus(http.StatusNotFound)
 }
 
-func (server *Server) securityHeadersFunction(c *gin.Context) {
+func (s *Server) securityHeadersFunction(c *gin.Context) {
 	c.Header("X-Frame-Options", "DENY")
 	c.Header("X-Content-Type-Options", "nosniff")
 	c.Header("X-XSS-Protection", "0")
@@ -171,14 +172,14 @@ func (server *Server) securityHeadersFunction(c *gin.Context) {
 	}
 }
 
-func (server *Server) recoveryFunction(c *gin.Context, recovered any) {
+func (s *Server) recoveryFunction(c *gin.Context, recovered any) {
 	log.Error().
 		Stack().
 		Err(fmt.Errorf("%v", recovered)).
 		Msg("Panic inside an HTTP handler function")
 
-	if server.panicHandler != nil {
-		server.panicHandler(c, recovered)
+	if s.panicHandler != nil {
+		s.panicHandler(c, recovered)
 		return
 	}
 

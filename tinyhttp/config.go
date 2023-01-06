@@ -12,8 +12,14 @@ type ServerConfig struct {
 	// Network is a network type for the listener (default: "tcp").
 	Network string
 
+	// GinMode defines working mode of the Gin library (default: Release).
+	GinMode string
+
 	// SecurityHeaders defines whether to include HTTP security headers to all responses or not (default: true).
 	SecurityHeaders bool
+
+	// MethodNotAllowed defines whether the library handles method not allowed errors (default: false).
+	MethodNotAllowed bool
 
 	// ShutdownTimeout defines a maximal timeout of HTTP server shutdown (default: 5s).
 	ShutdownTimeout time.Duration
@@ -61,10 +67,24 @@ func Network(network string) ServerOpt {
 	}
 }
 
+// GinMode defines working mode of the Gin library.
+func GinMode(mode string) ServerOpt {
+	return func(config *ServerConfig) {
+		config.GinMode = mode
+	}
+}
+
 // SecurityHeaders defines whether to include HTTP security headers to all responses or not.
 func SecurityHeaders(securityHeaders bool) ServerOpt {
 	return func(config *ServerConfig) {
 		config.SecurityHeaders = securityHeaders
+	}
+}
+
+// MethodNotAllowed defines whether the library handles method not allowed errors.
+func MethodNotAllowed(methodNotAllowed bool) ServerOpt {
+	return func(config *ServerConfig) {
+		config.MethodNotAllowed = methodNotAllowed
 	}
 }
 
