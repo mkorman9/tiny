@@ -25,8 +25,7 @@ import (
 )
 
 func main() {
-	tiny.LoadConfig()
-	tiny.SetupLogger()
+	tiny.Init()
 
 	httpServer := tinyhttp.NewServer(
 		config.String("http.address", "0.0.0.0:8080"),
