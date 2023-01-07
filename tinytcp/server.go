@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/rs/zerolog/log"
-	mathrand "math/rand"
 	"net"
 	"sync"
 	"time"
@@ -17,12 +16,11 @@ type Server struct {
 	config                 *ServerConfig
 	listener               net.Listener
 	forkingStrategy        ForkingStrategy
-	sockets                []*ClientSocket
+	sockets                map[*ClientSocket]struct{}
 	socketsMutex           sync.RWMutex
 	ticker                 *time.Ticker
 	metrics                ServerMetrics
 	metricsUpdateHandler   func()
-	idRand                 *mathrand.Rand
 	clientSocketPool       sync.Pool
 	byteCountingReaderPool sync.Pool
 	byteCountingWriterPool sync.Pool
@@ -45,7 +43,6 @@ func NewServer(address string, opts ...ServerOpt) *Server {
 
 	return &Server{
 		config: config,
-		idRand: mathrand.New(mathrand.NewSource(time.Now().Unix())),
 		clientSocketPool: sync.Pool{
 			New: func() any {
 				return &ClientSocket{}
@@ -114,10 +111,11 @@ func (s *Server) Start() error {
 		s.listener = socket
 	}
 
-	log.Info().Msgf("TCP server started (%s)", s.config.address)
 	go s.startBackgroundJob()
 	s.forkingStrategy.OnStart()
 
+	log.Info().Msgf("TCP server started (%s)", s.config.address)
+	
 	for {
 		connection, err := s.listener.Accept()
 		if err != nil {
@@ -166,7 +164,7 @@ func (s *Server) Sockets() []*ClientSocket {
 	defer s.socketsMutex.RUnlock()
 
 	var list []*ClientSocket
-	for _, socket := range s.sockets {
+	for socket := range s.sockets {
 		if !socket.IsClosed() {
 			list = append(list, socket)
 		}
@@ -186,7 +184,7 @@ func (s *Server) OnMetricsUpdate(handler func()) {
 }
 
 func (s *Server) handleNewConnection(connection net.Conn) {
-	clientSocket := s.newClientSocket(connection, s.idRand.Int63())
+	clientSocket := s.newClientSocket(connection)
 
 	if registered := s.registerClientSocket(clientSocket); !registered {
 		// instantly terminate the connection if it can't be added to the server pool
@@ -195,12 +193,12 @@ func (s *Server) handleNewConnection(connection net.Conn) {
 		return
 	}
 
-	log.Debug().Msgf("Opening TCP client connection #%d (%s)", clientSocket.Id(), clientSocket.RemoteAddress())
+	log.Debug().Msgf("Opening TCP client connection: %s", clientSocket.connection.RemoteAddr().String())
 
 	s.forkingStrategy.OnAccept(clientSocket)
 }
 
-func (s *Server) newClientSocket(connection net.Conn, id int64) *ClientSocket {
+func (s *Server) newClientSocket(connection net.Conn) *ClientSocket {
 	reader := s.byteCountingReaderPool.Get().(*byteCountingReader)
 	reader.reader = connection
 
@@ -208,7 +206,6 @@ func (s *Server) newClientSocket(connection net.Conn, id int64) *ClientSocket {
 	writer.writer = connection
 
 	cs := s.clientSocketPool.Get().(*ClientSocket)
-	cs.id = id
 	cs.remoteAddress = parseRemoteAddress(connection)
 	cs.connectedAt = time.Now()
 	cs.connection = connection
@@ -227,7 +224,7 @@ func (s *Server) registerClientSocket(clientSocket *ClientSocket) bool {
 		return false
 	}
 
-	s.sockets = append(s.sockets, clientSocket)
+	s.sockets[clientSocket] = struct{}{}
 	return true
 }
 
@@ -264,7 +261,7 @@ func (s *Server) updateMetrics() {
 	}
 	s.forkingStrategy.OnMetricsUpdate(&s.metrics)
 
-	for _, socket := range s.sockets {
+	for socket := range s.sockets {
 		reads := socket.ReadsPerSecond()
 		writes := socket.WritesPerSecond()
 
@@ -278,7 +275,7 @@ func (s *Server) updateMetrics() {
 		s.metricsUpdateHandler()
 	}
 
-	for _, socket := range s.sockets {
+	for socket := range s.sockets {
 		socket.resetMetrics()
 	}
 }
@@ -287,29 +284,11 @@ func (s *Server) cleanupClientSockets() {
 	s.socketsMutex.Lock()
 	defer s.socketsMutex.Unlock()
 
-	var toRemove map[*ClientSocket]struct{}
-
-	for _, socket := range s.sockets {
+	for socket := range s.sockets {
 		if socket.IsClosed() {
-			if toRemove == nil {
-				toRemove = map[*ClientSocket]struct{}{}
-			}
-
-			toRemove[socket] = struct{}{}
+			delete(s.sockets, socket)
+			s.recycleClientSocket(socket)
 		}
-	}
-
-	if len(toRemove) > 0 {
-		var sockets []*ClientSocket
-		for _, socket := range s.sockets {
-			if _, toBeRemoved := toRemove[socket]; toBeRemoved {
-				s.recycleClientSocket(socket)
-			} else {
-				sockets = append(sockets, socket)
-			}
-		}
-
-		s.sockets = sockets
 	}
 }
 

@@ -12,7 +12,6 @@ import (
 
 // ClientSocket represents a dedicated socket for given TCP client.
 type ClientSocket struct {
-	id                 int64
 	remoteAddress      string
 	connectedAt        time.Time
 	connection         net.Conn
@@ -30,7 +29,6 @@ type ClientSocket struct {
 type ClientSocketHandler func(*ClientSocket)
 
 func (cs *ClientSocket) reset() {
-	cs.id = 0
 	cs.remoteAddress = ""
 	cs.connection = nil
 	cs.reader = nil
@@ -41,11 +39,6 @@ func (cs *ClientSocket) reset() {
 	cs.closeOnce = sync.Once{}
 	cs.closeHandlers = nil
 	cs.closeHandlersMutex = sync.RWMutex{}
-}
-
-// Id returns a unique id associated with this socket.
-func (cs *ClientSocket) Id() int64 {
-	return cs.id
 }
 
 // RemoteAddress returns a remote address of the client.
@@ -66,12 +59,15 @@ func (cs *ClientSocket) IsClosed() bool {
 // Close closes TCP connection.
 func (cs *ClientSocket) Close() {
 	cs.closeOnce.Do(func() {
-		log.Debug().Msgf("Closing TCP client connection #%d", cs.id)
+		log.Debug().
+			Msgf("Closing TCP client connection: %s", cs.connection.RemoteAddr().String())
 
 		atomic.StoreUint32(&cs.isClosed, 1)
 
 		if err := cs.connection.Close(); err != nil {
-			log.Error().Err(err).Msgf("Error while closing TCP client connection #%d", cs.id)
+			log.Error().
+				Err(err).
+				Msgf("Error while closing TCP client connection: %s", cs.connection.RemoteAddr().String())
 		}
 
 		cs.closeHandlersMutex.RLock()
@@ -89,12 +85,15 @@ func (cs *ClientSocket) Read(b []byte) (int, error) {
 	n, err := cs.reader.Read(b)
 	if err != nil {
 		if isBrokenPipe(err) {
-			log.Debug().Msgf("Connection closed by TCP client #%d", cs.id)
+			log.Debug().
+				Msgf("Connection closed by TCP client: %s", cs.connection.RemoteAddr().String())
 			cs.Close()
 		} else if isTimeout(err) {
 			// ignore
 		} else {
-			log.Error().Err(err).Msgf("Error while reading from TCP client connection #%d", cs.id)
+			log.Error().
+				Err(err).
+				Msgf("Error while reading from TCP client connection: %s", cs.connection.RemoteAddr().String())
 		}
 
 		return n, err
@@ -108,12 +107,15 @@ func (cs *ClientSocket) Write(b []byte) (int, error) {
 	n, err := cs.writer.Write(b)
 	if err != nil {
 		if isBrokenPipe(err) {
-			log.Debug().Msgf("Connection closed by TCP client #%d", cs.id)
+			log.Debug().
+				Msgf("Connection closed by TCP client: %s", cs.connection.RemoteAddr().String())
 			cs.Close()
 		} else if isTimeout(err) {
 			// ignore
 		} else {
-			log.Error().Err(err).Msgf("Error while writing to TCP client connection #%d", cs.id)
+			log.Error().
+				Err(err).
+				Msgf("Error while writing to TCP client connection: %s", cs.connection.RemoteAddr().String())
 		}
 
 		return n, err
@@ -127,12 +129,15 @@ func (cs *ClientSocket) SetReadDeadline(deadline time.Time) error {
 	err := cs.connection.SetReadDeadline(deadline)
 	if err != nil {
 		if isBrokenPipe(err) {
-			log.Debug().Msgf("Connection closed by TCP client #%d", cs.id)
+			log.Debug().
+				Msgf("Connection closed by TCP client: %s", cs.connection.RemoteAddr().String())
 			cs.Close()
 		} else if isTimeout(err) {
 			// ignore
 		} else {
-			log.Error().Err(err).Msgf("Error while setting read deadline for TCP client connection #%d", cs.id)
+			log.Error().
+				Err(err).
+				Msgf("Error while setting read deadline for TCP client connection: %s", cs.connection.RemoteAddr().String())
 		}
 
 		return err
@@ -146,12 +151,15 @@ func (cs *ClientSocket) SetWriteDeadline(deadline time.Time) error {
 	err := cs.connection.SetWriteDeadline(deadline)
 	if err != nil {
 		if isBrokenPipe(err) {
-			log.Debug().Msgf("Connection closed by TCP client #%d", cs.id)
+			log.Debug().
+				Msgf("Connection closed by TCP client: %s", cs.connection.RemoteAddr().String())
 			cs.Close()
 		} else if isTimeout(err) {
 			// ignore
 		} else {
-			log.Error().Err(err).Msgf("Error while setting write deadline for TCP client connection #%d", cs.id)
+			log.Error().
+				Err(err).
+				Msgf("Error while setting write deadline for TCP client connection: %s", cs.connection.RemoteAddr().String())
 		}
 
 		return err
