@@ -42,7 +42,8 @@ func NewServer(address string, opts ...ServerOpt) *Server {
 	}
 
 	return &Server{
-		config: config,
+		config:  config,
+		sockets: make(map[*ClientSocket]struct{}),
 		clientSocketPool: sync.Pool{
 			New: func() any {
 				return &ClientSocket{}
@@ -115,7 +116,7 @@ func (s *Server) Start() error {
 	s.forkingStrategy.OnStart()
 
 	log.Info().Msgf("TCP server started (%s)", s.config.address)
-	
+
 	for {
 		connection, err := s.listener.Accept()
 		if err != nil {
