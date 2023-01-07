@@ -252,11 +252,11 @@ func (s *Server) startBackgroundJob() {
 
 func (s *Server) updateMetrics() {
 	s.socketsMutex.RLock()
-	defer s.socketsMutex.RUnlock()
+	s.metrics.Connections = len(s.sockets)
+	s.socketsMutex.RUnlock()
 
 	s.metrics.ReadsPerSecond = 0
 	s.metrics.WritesPerSecond = 0
-	s.metrics.Connections = len(s.sockets)
 	if s.metrics.Connections > s.metrics.MaxConnections {
 		s.metrics.MaxConnections = s.metrics.Connections
 	}
