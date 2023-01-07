@@ -216,13 +216,3 @@ func (cs *ClientSocket) resetMetrics() {
 	cs.byteCountingReader.reset()
 	cs.byteCountingWriter.reset()
 }
-
-func parseRemoteAddress(connection net.Conn) string {
-	address := connection.RemoteAddr().String()
-	host, _, err := net.SplitHostPort(address)
-	if err != nil {
-		return ""
-	}
-
-	return host
-}

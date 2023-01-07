@@ -37,3 +37,13 @@ func isBrokenPipe(err error) bool {
 func isTimeout(err error) bool {
 	return errors.Is(err, os.ErrDeadlineExceeded)
 }
+
+func parseRemoteAddress(connection net.Conn) string {
+	address := connection.RemoteAddr().String()
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return ""
+	}
+
+	return host
+}

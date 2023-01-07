@@ -188,7 +188,7 @@ func (s *Server) OnMetricsUpdate(handler func()) {
 func (s *Server) handleNewConnection(connection net.Conn) {
 	clientSocket := s.newClientSocket(connection, s.idRand.Int63())
 
-	if added := s.addClientSocket(clientSocket); !added {
+	if registered := s.registerClientSocket(clientSocket); !registered {
 		// instantly terminate the connection if it can't be added to the server pool
 		_ = clientSocket.connection.Close()
 		s.recycleClientSocket(clientSocket)
@@ -217,6 +217,18 @@ func (s *Server) newClientSocket(connection net.Conn, id int64) *ClientSocket {
 	cs.byteCountingReader = reader
 	cs.byteCountingWriter = writer
 	return cs
+}
+
+func (s *Server) registerClientSocket(clientSocket *ClientSocket) bool {
+	s.socketsMutex.Lock()
+	defer s.socketsMutex.Unlock()
+
+	if s.config.MaxClients >= 0 && len(s.sockets) >= s.config.MaxClients {
+		return false
+	}
+
+	s.sockets = append(s.sockets, clientSocket)
+	return true
 }
 
 func (s *Server) startBackgroundJob() {
@@ -269,18 +281,6 @@ func (s *Server) updateMetrics() {
 	for _, socket := range s.sockets {
 		socket.resetMetrics()
 	}
-}
-
-func (s *Server) addClientSocket(clientSocket *ClientSocket) bool {
-	s.socketsMutex.Lock()
-	defer s.socketsMutex.Unlock()
-
-	if s.config.MaxClients >= 0 && len(s.sockets) >= s.config.MaxClients {
-		return false
-	}
-
-	s.sockets = append(s.sockets, clientSocket)
-	return true
 }
 
 func (s *Server) cleanupClientSockets() {
