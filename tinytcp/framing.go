@@ -142,12 +142,24 @@ func (l *lengthPrefixedFramingProtocol) ExtractPacket(accumulator []byte) (packe
 
 	if len(accumulator) >= prefixLength {
 		switch l.prefixLength {
+		case PrefixInt16_BE:
+			prefixLength = 2
+			packetSize = int(binary.BigEndian.Uint16(accumulator[:prefixLength]))
+		case PrefixInt16_LE:
+			prefixLength = 2
+			packetSize = int(binary.LittleEndian.Uint16(accumulator[:prefixLength]))
 		case PrefixInt32_BE:
 			prefixLength = 4
 			packetSize = int(binary.BigEndian.Uint32(accumulator[:prefixLength]))
 		case PrefixInt32_LE:
 			prefixLength = 4
 			packetSize = int(binary.LittleEndian.Uint32(accumulator[:prefixLength]))
+		case PrefixInt64_BE:
+			prefixLength = 8
+			packetSize = int(binary.BigEndian.Uint64(accumulator[:prefixLength]))
+		case PrefixInt64_LE:
+			prefixLength = 8
+			packetSize = int(binary.LittleEndian.Uint64(accumulator[:prefixLength]))
 		}
 	} else {
 		return nil, accumulator, false
