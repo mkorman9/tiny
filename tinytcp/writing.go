@@ -37,28 +37,53 @@ func WriteBool(writer io.Writer, value bool) error {
 }
 
 // WriteInt16 writes int16 into given writer.
-func WriteInt16(writer io.Writer, value int16) error {
-	return binary.Write(writer, binary.BigEndian, value)
+func WriteInt16(writer io.Writer, value int16, byteOrder ...binary.ByteOrder) error {
+	var order binary.ByteOrder = binary.BigEndian
+	if len(byteOrder) > 0 {
+		order = byteOrder[0]
+	}
+
+	return binary.Write(writer, order, value)
 }
 
 // WriteInt32 writes int32 into given writer.
-func WriteInt32(writer io.Writer, value int32) error {
-	return binary.Write(writer, binary.BigEndian, value)
+func WriteInt32(writer io.Writer, value int32, byteOrder ...binary.ByteOrder) error {
+	var order binary.ByteOrder = binary.BigEndian
+	if len(byteOrder) > 0 {
+		order = byteOrder[0]
+	}
+
+	return binary.Write(writer, order, value)
 }
 
 // WriteInt64 writes int64 into given writer.
-func WriteInt64(writer io.Writer, value int64) error {
-	return binary.Write(writer, binary.BigEndian, value)
+func WriteInt64(writer io.Writer, value int64, byteOrder ...binary.ByteOrder) error {
+	var order binary.ByteOrder = binary.BigEndian
+	if len(byteOrder) > 0 {
+		order = byteOrder[0]
+	}
+
+	return binary.Write(writer, order, value)
 }
 
 // WriteFloat32 writes float32 into given writer.
-func WriteFloat32(writer io.Writer, value float32) error {
-	return binary.Write(writer, binary.BigEndian, value)
+func WriteFloat32(writer io.Writer, value float32, byteOrder ...binary.ByteOrder) error {
+	var order binary.ByteOrder = binary.BigEndian
+	if len(byteOrder) > 0 {
+		order = byteOrder[0]
+	}
+
+	return binary.Write(writer, order, value)
 }
 
 // WriteFloat64 writes float64 into given writer.
-func WriteFloat64(writer io.Writer, value float64) error {
-	return binary.Write(writer, binary.BigEndian, value)
+func WriteFloat64(writer io.Writer, value float64, byteOrder ...binary.ByteOrder) error {
+	var order binary.ByteOrder = binary.BigEndian
+	if len(byteOrder) > 0 {
+		order = byteOrder[0]
+	}
+
+	return binary.Write(writer, order, value)
 }
 
 // WriteVarInt writes var int into given writer.

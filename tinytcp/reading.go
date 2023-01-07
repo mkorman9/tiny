@@ -49,33 +49,48 @@ func ReadBool(reader io.Reader) (bool, error) {
 }
 
 // ReadInt16 reads int16 from given reader.
-func ReadInt16(reader io.Reader) (int16, error) {
+func ReadInt16(reader io.Reader, byteOrder ...binary.ByteOrder) (int16, error) {
 	b, err := ReadBytes(reader, 2)
 	if err != nil {
 		return 0, err
 	}
 
-	return int16(binary.BigEndian.Uint16(b)), nil
+	var order binary.ByteOrder = binary.BigEndian
+	if len(byteOrder) > 0 {
+		order = byteOrder[0]
+	}
+
+	return int16(order.Uint16(b)), nil
 }
 
 // ReadInt32 reads int32 from given reader.
-func ReadInt32(reader io.Reader) (int32, error) {
+func ReadInt32(reader io.Reader, byteOrder ...binary.ByteOrder) (int32, error) {
 	b, err := ReadBytes(reader, 4)
 	if err != nil {
 		return 0, err
 	}
 
-	return int32(binary.BigEndian.Uint32(b)), nil
+	var order binary.ByteOrder = binary.BigEndian
+	if len(byteOrder) > 0 {
+		order = byteOrder[0]
+	}
+
+	return int32(order.Uint16(b)), nil
 }
 
 // ReadInt64 reads int64 from given reader.
-func ReadInt64(reader io.Reader) (int64, error) {
+func ReadInt64(reader io.Reader, byteOrder ...binary.ByteOrder) (int64, error) {
 	b, err := ReadBytes(reader, 8)
 	if err != nil {
 		return 0, err
 	}
 
-	return int64(binary.BigEndian.Uint64(b)), nil
+	var order binary.ByteOrder = binary.BigEndian
+	if len(byteOrder) > 0 {
+		order = byteOrder[0]
+	}
+
+	return int64(order.Uint16(b)), nil
 }
 
 // ReadVarInt reads var int from given reader.
@@ -133,8 +148,8 @@ func ReadVarLong(reader io.Reader) (int64, error) {
 }
 
 // ReadFloat32 reads float32 from given reader.
-func ReadFloat32(reader io.Reader) (float32, error) {
-	value, err := ReadInt32(reader)
+func ReadFloat32(reader io.Reader, byteOrder ...binary.ByteOrder) (float32, error) {
+	value, err := ReadInt32(reader, byteOrder...)
 	if err != nil {
 		return 0, err
 	}
@@ -143,8 +158,8 @@ func ReadFloat32(reader io.Reader) (float32, error) {
 }
 
 // ReadFloat64 reads float64 from given reader.
-func ReadFloat64(reader io.Reader) (float64, error) {
-	value, err := ReadInt64(reader)
+func ReadFloat64(reader io.Reader, byteOrder ...binary.ByteOrder) (float64, error) {
+	value, err := ReadInt64(reader, byteOrder...)
 	if err != nil {
 		return 0, err
 	}
