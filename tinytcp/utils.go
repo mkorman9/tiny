@@ -12,8 +12,11 @@ import (
 type PrefixLength int
 
 const (
+	// PrefixVarInt represents a VarInt prefix.
+	PrefixVarInt PrefixLength = iota
+
 	// PrefixInt16_BE 16-bit prefix (Big Endian).
-	PrefixInt16_BE PrefixLength = iota
+	PrefixInt16_BE
 
 	// PrefixInt16_LE 16-bit prefix (Little Endian).
 	PrefixInt16_LE
