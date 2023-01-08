@@ -34,6 +34,20 @@ func TestVarIntPrefixFraming(t *testing.T) {
 	assert.Len(t, rest, 0, "packet should be only data in buffer")
 }
 
+func TestVarLongPrefixFraming(t *testing.T) {
+	// given
+	protocol := LengthPrefixedFraming(PrefixVarLong)
+	payload := generateVarIntTestPayload(128)
+
+	// when
+	packet, rest, extracted := protocol.ExtractPacket(payload)
+
+	// then
+	assert.True(t, extracted, "packet should be extracted")
+	assert.True(t, validateTestPayload(128, packet), "packet should be valid")
+	assert.Len(t, rest, 0, "packet should be only data in buffer")
+}
+
 func TestInt16PrefixFraming(t *testing.T) {
 	// given
 	protocol := LengthPrefixedFraming(PrefixInt16_BE)

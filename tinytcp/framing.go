@@ -165,6 +165,12 @@ func (l *lengthPrefixedFramingProtocol) ExtractPacket(accumulator []byte) (packe
 			if !valueRead {
 				return nil, accumulator, false
 			}
+		case PrefixVarLong:
+			valueRead := false
+			prefixLength, packetSize, valueRead = readVarLongPacketSize(accumulator)
+			if !valueRead {
+				return nil, accumulator, false
+			}
 		case PrefixInt16_BE:
 			prefixLength = 2
 			packetSize = int64(binary.BigEndian.Uint16(accumulator[:prefixLength]))
@@ -232,4 +238,33 @@ func readVarIntPacketSize(buffer []byte) (int, int64, bool) {
 	}
 
 	return i + 1, int64(value), true
+}
+
+func readVarLongPacketSize(buffer []byte) (int, int64, bool) {
+	var (
+		value    int64
+		position int
+		i        int
+	)
+
+	for {
+		if i >= len(buffer) {
+			return 0, 0, false
+		}
+		currentByte := buffer[i]
+
+		value |= int64(currentByte) & int64(segmentBits) << position
+		if (int(currentByte) & continueBit) == 0 {
+			break
+		}
+
+		position += 7
+		if position >= 64 {
+			return 0, 0, false
+		}
+
+		i++
+	}
+
+	return i + 1, value, true
 }

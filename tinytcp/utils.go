@@ -15,6 +15,9 @@ const (
 	// PrefixVarInt represents a VarInt prefix.
 	PrefixVarInt PrefixLength = iota
 
+	// PrefixVarLong represents a VarLong prefix.
+	PrefixVarLong
+
 	// PrefixInt16_BE 16-bit prefix (Big Endian).
 	PrefixInt16_BE
 
