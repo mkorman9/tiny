@@ -206,14 +206,17 @@ func LengthPrefixedFraming(prefixLength PrefixLength) FramingProtocol {
 }
 
 func readVarIntPacketSize(buffer []byte) (int, int64, bool) {
-	var value int
-	var position int
+	var (
+		value    int
+		position int
+		i        int
+	)
 
 	for {
-		if position >= len(buffer) {
+		if i >= len(buffer) {
 			return 0, 0, false
 		}
-		currentByte := buffer[position]
+		currentByte := buffer[i]
 
 		value |= int(currentByte) & segmentBits << position
 		if (int(currentByte) & continueBit) == 0 {
@@ -224,7 +227,9 @@ func readVarIntPacketSize(buffer []byte) (int, int64, bool) {
 		if position >= 32 {
 			return 0, 0, false
 		}
+
+		i++
 	}
 
-	return position / 4, int64(value), true
+	return i + 1, int64(value), true
 }
