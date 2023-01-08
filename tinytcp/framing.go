@@ -40,17 +40,47 @@ type lengthPrefixedFramingProtocol struct {
 	prefixLength PrefixLength
 }
 
+// PacketFramingConfig hold configuration for PacketFramingHandler.
+type PacketFramingConfig struct {
+	readBufferSize int
+	maxPacketSize  int
+}
+
+// PacketFramingOpt represents an option to be specified to PacketFramingHandler.
+type PacketFramingOpt = func(*PacketFramingConfig)
+
+// ReadBufferSize sets a size of read buffer (default: 4KiB)
+func ReadBufferSize(size int) PacketFramingOpt {
+	return func(config *PacketFramingConfig) {
+		config.readBufferSize = size
+	}
+}
+
+// MaxPacketSize sets a maximal size of a packet (default: 16KiB)
+func MaxPacketSize(size int) PacketFramingOpt {
+	return func(config *PacketFramingConfig) {
+		config.maxPacketSize = size
+	}
+}
+
 // PacketFramingHandler returns a ClientSocketHandler that handles packet framing according to given FramingProtocol.
 func PacketFramingHandler(
 	framingProtocol FramingProtocol,
-	readBufferSize int,
-	maxPacketSize int,
 	handler func(ctx PacketFramingContext),
+	opts ...PacketFramingOpt,
 ) ClientSocketHandler {
+	config := &PacketFramingConfig{
+		readBufferSize: 4 * 1024,
+		maxPacketSize:  16 * 1024,
+	}
+	for _, opt := range opts {
+		opt(config)
+	}
+
 	var (
 		readBufferPool = sync.Pool{
 			New: func() any {
-				return make([]byte, readBufferSize)
+				return make([]byte, config.readBufferSize)
 			},
 		}
 		packetFramingContextPool = sync.Pool{
@@ -90,7 +120,7 @@ func PacketFramingHandler(
 
 			buffer := readBuffer[:bytesRead]
 
-			if len(accumulator)+len(buffer) > maxPacketSize {
+			if config.maxPacketSize > 0 && len(accumulator)+len(buffer) > config.maxPacketSize {
 				accumulator = nil
 				continue
 			}
