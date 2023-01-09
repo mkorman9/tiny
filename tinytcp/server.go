@@ -30,7 +30,7 @@ type Server struct {
 func NewServer(address string, opts ...ServerOpt) *Server {
 	config := &ServerConfig{
 		address:    address,
-		Mode:       Both,
+		Network:    "tcp",
 		MaxClients: -1,
 		TLSConfig: &tls.Config{
 			Rand: rand.Reader,
@@ -77,14 +77,6 @@ func (s *Server) Start() error {
 		return errors.New("empty forking strategy")
 	}
 
-	listenMode := "tcp"
-	switch s.config.Mode {
-	case IPv4_Only:
-		listenMode = "tcp4"
-	case IPv6_Only:
-		listenMode = "tcp6"
-	}
-
 	if s.config.TLSCert != "" && s.config.TLSKey != "" {
 		var err error
 
@@ -97,14 +89,14 @@ func (s *Server) Start() error {
 		s.config.TLSConfig.Certificates = []tls.Certificate{cert}
 
 		var socket net.Listener
-		socket, err = tls.Listen(listenMode, s.config.address, s.config.TLSConfig)
+		socket, err = tls.Listen(s.config.Network, s.config.address, s.config.TLSConfig)
 		if err != nil {
 			return err
 		}
 
 		s.listener = socket
 	} else {
-		socket, err := net.Listen(listenMode, s.config.address)
+		socket, err := net.Listen(s.config.Network, s.config.address)
 		if err != nil {
 			return err
 		}

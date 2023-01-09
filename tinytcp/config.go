@@ -2,26 +2,12 @@ package tinytcp
 
 import "crypto/tls"
 
-// ListenMode is a mode in which the server starts listening.
-type ListenMode = int
-
-const (
-	// Both means listen in both IPv4, IPv6 modes.
-	Both ListenMode = iota
-
-	// IPv4_Only means listen in IPv4 mode only.
-	IPv4_Only
-
-	// IPv6_Only means listen in IPv6 mode only.
-	IPv6_Only
-)
-
 // ServerConfig holds a configuration for NewServer.
 type ServerConfig struct {
 	address string
 
-	// Mode is a mode in which the server starts listening - IPv4_Only, IPv6_Only or Both (default: Both).
-	Mode ListenMode
+	// Network is a network parameter to pass to net.Listen (default: "tcp").
+	Network string
 
 	// Max clients denotes the maximum number of connection that can be accepted at once, -1 for no limit (default: -1).
 	MaxClients int
@@ -39,10 +25,10 @@ type ServerConfig struct {
 // ServerOpt is an option to be specified to NewServer.
 type ServerOpt func(*ServerConfig)
 
-// Mode is a mode in which the server starts listening - IPv4_Only, IPv6_Only or Both.
-func Mode(mode ListenMode) ServerOpt {
+// Network is a network parameter to pass to net.Listen.
+func Network(network string) ServerOpt {
 	return func(config *ServerConfig) {
-		config.Mode = mode
+		config.Network = network
 	}
 }
 
