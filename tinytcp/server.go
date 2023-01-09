@@ -1,7 +1,6 @@
 package tinytcp
 
 import (
-	"crypto/rand"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -32,9 +31,7 @@ func NewServer(address string, opts ...ServerOpt) *Server {
 		address:    address,
 		Network:    "tcp",
 		MaxClients: -1,
-		TLSConfig: &tls.Config{
-			Rand: rand.Reader,
-		},
+		TLSConfig:  &tls.Config{},
 	}
 
 	for _, opt := range opts {
@@ -77,19 +74,29 @@ func (s *Server) Start() error {
 		return errors.New("empty forking strategy")
 	}
 
-	if s.config.TLSCert != "" && s.config.TLSKey != "" {
-		var err error
+	err := s.startListener()
+	if err != nil {
+		return err
+	}
 
-		var cert tls.Certificate
-		cert, err = tls.LoadX509KeyPair(s.config.TLSCert, s.config.TLSKey)
+	go s.startBackgroundJob()
+	s.forkingStrategy.OnStart()
+
+	log.Info().Msgf("TCP server started (%s)", s.config.address)
+
+	return s.acceptLoop()
+}
+
+func (s *Server) startListener() error {
+	if s.config.TLSCert != "" && s.config.TLSKey != "" {
+		cert, err := tls.LoadX509KeyPair(s.config.TLSCert, s.config.TLSKey)
 		if err != nil {
 			return err
 		}
 
 		s.config.TLSConfig.Certificates = []tls.Certificate{cert}
 
-		var socket net.Listener
-		socket, err = tls.Listen(s.config.Network, s.config.address, s.config.TLSConfig)
+		socket, err := tls.Listen(s.config.Network, s.config.address, s.config.TLSConfig)
 		if err != nil {
 			return err
 		}
@@ -104,11 +111,10 @@ func (s *Server) Start() error {
 		s.listener = socket
 	}
 
-	go s.startBackgroundJob()
-	s.forkingStrategy.OnStart()
+	return nil
+}
 
-	log.Info().Msgf("TCP server started (%s)", s.config.address)
-
+func (s *Server) acceptLoop() error {
 	for {
 		connection, err := s.listener.Accept()
 		if err != nil {
