@@ -48,14 +48,14 @@ type PacketFramingConfig struct {
 // PacketFramingOpt represents an option to be specified to PacketFramingHandler.
 type PacketFramingOpt = func(*PacketFramingConfig)
 
-// ReadBufferSize sets a size of read buffer (default: 4KiB)
+// ReadBufferSize sets a size of read buffer (default: 4KiB).
 func ReadBufferSize(size int) PacketFramingOpt {
 	return func(config *PacketFramingConfig) {
 		config.readBufferSize = size
 	}
 }
 
-// MaxPacketSize sets a maximal size of a packet (default: 16KiB)
+// MaxPacketSize sets a maximal size of a packet (default: 16KiB).
 func MaxPacketSize(size int) PacketFramingOpt {
 	return func(config *PacketFramingConfig) {
 		config.maxPacketSize = size
@@ -95,8 +95,8 @@ func PacketFramingHandler(
 		handler(ctx)
 
 		var (
-			accumulator []byte
-			readBuffer  = readBufferPool.Get().([]byte)
+			readBuffer    = readBufferPool.Get().([]byte)
+			receiveBuffer []byte
 		)
 
 		defer func() {
@@ -117,22 +117,22 @@ func PacketFramingHandler(
 				continue
 			}
 
-			buffer := readBuffer[:bytesRead]
+			receivedBytes := readBuffer[:bytesRead]
 
-			if config.maxPacketSize > 0 && len(accumulator)+len(buffer) > config.maxPacketSize {
-				accumulator = nil
+			if config.maxPacketSize > 0 && len(receiveBuffer)+len(receivedBytes) > config.maxPacketSize {
+				receiveBuffer = nil
 				continue
 			}
 
-			accumulator = bytes.Join([][]byte{accumulator, buffer}, nil)
+			receiveBuffer = bytes.Join([][]byte{receiveBuffer, receivedBytes}, nil)
 
 			for {
-				packet, newAccumulator, ok := framingProtocol.ExtractPacket(accumulator)
+				packet, buff, ok := framingProtocol.ExtractPacket(receiveBuffer)
 				if !ok {
 					break
 				}
 
-				accumulator = newAccumulator
+				receiveBuffer = buff
 				ctx.handlePacket(packet)
 			}
 		}
@@ -161,8 +161,8 @@ func SplitBySeparator(separator []byte) FramingProtocol {
 	}
 }
 
-func (s *separatorFramingProtocol) ExtractPacket(accumulator []byte) ([]byte, []byte, bool) {
-	return bytes.Cut(accumulator, s.separator)
+func (s *separatorFramingProtocol) ExtractPacket(buffer []byte) ([]byte, []byte, bool) {
+	return bytes.Cut(buffer, s.separator)
 }
 
 // LengthPrefixedFraming is a FramingProtocol that expects each packet to be prefixed with its length in bytes.
@@ -174,7 +174,7 @@ func LengthPrefixedFraming(prefixLength PrefixLength) FramingProtocol {
 	}
 }
 
-func (l *lengthPrefixedFramingProtocol) ExtractPacket(accumulator []byte) ([]byte, []byte, bool) {
+func (l *lengthPrefixedFramingProtocol) ExtractPacket(buffer []byte) ([]byte, []byte, bool) {
 	var (
 		prefixLength int
 		packetSize   int64
@@ -195,42 +195,42 @@ func (l *lengthPrefixedFramingProtocol) ExtractPacket(accumulator []byte) ([]byt
 		prefixLength = 8
 	}
 
-	if len(accumulator) >= prefixLength {
+	if len(buffer) >= prefixLength {
 		switch l.prefixLength {
 		case PrefixVarInt:
 			valueRead := false
-			prefixLength, packetSize, valueRead = readVarIntPacketSize(accumulator)
+			prefixLength, packetSize, valueRead = readVarIntPacketSize(buffer)
 			if !valueRead {
-				return nil, accumulator, false
+				return nil, buffer, false
 			}
 		case PrefixVarLong:
 			valueRead := false
-			prefixLength, packetSize, valueRead = readVarLongPacketSize(accumulator)
+			prefixLength, packetSize, valueRead = readVarLongPacketSize(buffer)
 			if !valueRead {
-				return nil, accumulator, false
+				return nil, buffer, false
 			}
 		case PrefixInt16_BE:
-			packetSize = int64(binary.BigEndian.Uint16(accumulator[:prefixLength]))
+			packetSize = int64(binary.BigEndian.Uint16(buffer[:prefixLength]))
 		case PrefixInt16_LE:
-			packetSize = int64(binary.LittleEndian.Uint16(accumulator[:prefixLength]))
+			packetSize = int64(binary.LittleEndian.Uint16(buffer[:prefixLength]))
 		case PrefixInt32_BE:
-			packetSize = int64(binary.BigEndian.Uint32(accumulator[:prefixLength]))
+			packetSize = int64(binary.BigEndian.Uint32(buffer[:prefixLength]))
 		case PrefixInt32_LE:
-			packetSize = int64(binary.LittleEndian.Uint32(accumulator[:prefixLength]))
+			packetSize = int64(binary.LittleEndian.Uint32(buffer[:prefixLength]))
 		case PrefixInt64_BE:
-			packetSize = int64(binary.BigEndian.Uint64(accumulator[:prefixLength]))
+			packetSize = int64(binary.BigEndian.Uint64(buffer[:prefixLength]))
 		case PrefixInt64_LE:
-			packetSize = int64(binary.LittleEndian.Uint64(accumulator[:prefixLength]))
+			packetSize = int64(binary.LittleEndian.Uint64(buffer[:prefixLength]))
 		}
 	} else {
-		return nil, accumulator, false
+		return nil, buffer, false
 	}
 
-	if int64(len(accumulator[prefixLength:])) >= packetSize {
-		accumulator = accumulator[prefixLength:]
-		return accumulator[:packetSize], accumulator[packetSize:], true
+	if int64(len(buffer[prefixLength:])) >= packetSize {
+		buffer = buffer[prefixLength:]
+		return buffer[:packetSize], buffer[packetSize:], true
 	} else {
-		return nil, accumulator, false
+		return nil, buffer, false
 	}
 }
 
