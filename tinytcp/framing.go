@@ -24,12 +24,11 @@ type packetFramingContext struct {
 	handler PacketHandler
 }
 
-// FramingProtocol defines a strategy of extracting meaningful chunks of data out of read buffer, sourced by
-// the underlying read pool. Job of the FramingProtocol is to search for packets inside the larger byte buffer.
+// FramingProtocol defines a strategy of extracting meaningful chunks of data out of read buffer.
 type FramingProtocol interface {
 	// ExtractPacket splits the buffer into packet and "the rest".
-	// Returns ok == true if the meaningful packet has been extracted.
-	ExtractPacket(accumulator []byte) (packetData []byte, newAccumulator []byte, ok bool)
+	// Returns extracted == true if the meaningful packet has been extracted.
+	ExtractPacket(accumulator []byte) (packet []byte, rest []byte, extracted bool)
 }
 
 type separatorFramingProtocol struct {
@@ -90,9 +89,9 @@ func PacketFramingHandler(
 		}
 	)
 
-	return func(client *ConnectedSocket) {
+	return func(socket *ConnectedSocket) {
 		ctx := packetFramingContextPool.Get().(*packetFramingContext)
-		ctx.socket = client
+		ctx.socket = socket
 		handler(ctx)
 
 		var (
@@ -109,9 +108,9 @@ func PacketFramingHandler(
 		}()
 
 		for {
-			bytesRead, err := client.Read(readBuffer)
+			bytesRead, err := socket.Read(readBuffer)
 			if err != nil {
-				if client.IsClosed() {
+				if socket.IsClosed() {
 					break
 				}
 
@@ -128,13 +127,13 @@ func PacketFramingHandler(
 			accumulator = bytes.Join([][]byte{accumulator, buffer}, nil)
 
 			for {
-				packetData, newAccumulator, ok := framingProtocol.ExtractPacket(accumulator)
+				packet, newAccumulator, ok := framingProtocol.ExtractPacket(accumulator)
 				if !ok {
 					break
 				}
 
-				ctx.notify(packetData)
 				accumulator = newAccumulator
+				ctx.handlePacket(packet)
 			}
 		}
 	}
@@ -148,14 +147,10 @@ func (p *packetFramingContext) OnPacket(handler PacketHandler) {
 	p.handler = handler
 }
 
-func (p *packetFramingContext) notify(packet []byte) {
+func (p *packetFramingContext) handlePacket(packet []byte) {
 	if p.handler != nil {
 		p.handler(packet)
 	}
-}
-
-func (s *separatorFramingProtocol) ExtractPacket(accumulator []byte) (packet []byte, newAccumulator []byte, ok bool) {
-	return bytes.Cut(accumulator, s.separator)
 }
 
 // SplitBySeparator is a FramingProtocol strategy that expects each packet to end with a sequence of bytes given as
@@ -166,7 +161,20 @@ func SplitBySeparator(separator []byte) FramingProtocol {
 	}
 }
 
-func (l *lengthPrefixedFramingProtocol) ExtractPacket(accumulator []byte) (packet []byte, newAccumulator []byte, ok bool) {
+func (s *separatorFramingProtocol) ExtractPacket(accumulator []byte) ([]byte, []byte, bool) {
+	return bytes.Cut(accumulator, s.separator)
+}
+
+// LengthPrefixedFraming is a FramingProtocol that expects each packet to be prefixed with its length in bytes.
+// Length is expected to be provided as binary encoded number with size and endianness specified by value provided
+// as prefixLength argument.
+func LengthPrefixedFraming(prefixLength PrefixLength) FramingProtocol {
+	return &lengthPrefixedFramingProtocol{
+		prefixLength: prefixLength,
+	}
+}
+
+func (l *lengthPrefixedFramingProtocol) ExtractPacket(accumulator []byte) ([]byte, []byte, bool) {
 	var (
 		prefixLength int
 		packetSize   int64
@@ -223,15 +231,6 @@ func (l *lengthPrefixedFramingProtocol) ExtractPacket(accumulator []byte) (packe
 		return accumulator[:packetSize], accumulator[packetSize:], true
 	} else {
 		return nil, accumulator, false
-	}
-}
-
-// LengthPrefixedFraming is a FramingProtocol that expects each packet to be prefixed with its length in bytes.
-// Length is expected to be provided as binary encoded number with size and endianness specified by value provided
-// as prefixLength argument.
-func LengthPrefixedFraming(prefixLength PrefixLength) FramingProtocol {
-	return &lengthPrefixedFramingProtocol{
-		prefixLength: prefixLength,
 	}
 }
 
