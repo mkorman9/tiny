@@ -9,18 +9,18 @@ import (
 // PacketHandler is a function to be called after receiving packet data.
 type PacketHandler func(packet []byte)
 
-// PacketFramingContext represents an interface that lets user subscribe on packets incoming from ClientSocket.
+// PacketFramingContext represents an interface that lets user subscribe on packets incoming from ConnectedSocket.
 // Packet framing is specified by FramingProtocol passed to PacketFramingHandler.
 type PacketFramingContext interface {
-	// Socket returns underlying ClientSocket.
-	Socket() *ClientSocket
+	// Socket returns underlying ConnectedSocket.
+	Socket() *ConnectedSocket
 
 	// OnPacket registers a handler that is run each time a packet is extracted from the read buffer.
 	OnPacket(handler PacketHandler)
 }
 
 type packetFramingContext struct {
-	socket  *ClientSocket
+	socket  *ConnectedSocket
 	handler PacketHandler
 }
 
@@ -63,12 +63,12 @@ func MaxPacketSize(size int) PacketFramingOpt {
 	}
 }
 
-// PacketFramingHandler returns a ClientSocketHandler that handles packet framing according to given FramingProtocol.
+// PacketFramingHandler returns a ConnectedSocketHandler that handles packet framing according to given FramingProtocol.
 func PacketFramingHandler(
 	framingProtocol FramingProtocol,
 	handler func(ctx PacketFramingContext),
 	opts ...PacketFramingOpt,
-) ClientSocketHandler {
+) ConnectedSocketHandler {
 	config := &PacketFramingConfig{
 		readBufferSize: 4 * 1024,
 		maxPacketSize:  16 * 1024,
@@ -90,7 +90,7 @@ func PacketFramingHandler(
 		}
 	)
 
-	return func(client *ClientSocket) {
+	return func(client *ConnectedSocket) {
 		ctx := packetFramingContextPool.Get().(*packetFramingContext)
 		ctx.socket = client
 		handler(ctx)
@@ -140,7 +140,7 @@ func PacketFramingHandler(
 	}
 }
 
-func (p *packetFramingContext) Socket() *ClientSocket {
+func (p *packetFramingContext) Socket() *ConnectedSocket {
 	return p.socket
 }
 

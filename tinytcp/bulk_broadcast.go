@@ -32,7 +32,7 @@ type bulkBroadcasterWorker struct {
 
 type broadcastMessage struct {
 	data    []byte
-	targets []*ClientSocket
+	targets []*ConnectedSocket
 }
 
 // StartBulkBroadcaster creates and starts BulkBroadcaster.
@@ -70,7 +70,7 @@ func (b *BulkBroadcaster) Stop() {
 
 // Broadcast schedules data to be written to all the sockets specified by targets array.
 // The work will be split between workers for efficient processing.
-func (b *BulkBroadcaster) Broadcast(data []byte, targets []*ClientSocket) error {
+func (b *BulkBroadcaster) Broadcast(data []byte, targets []*ConnectedSocket) error {
 	if len(b.workers) == 0 {
 		return errors.New("no workers in pool")
 	}
@@ -114,7 +114,7 @@ func (b *BulkBroadcaster) startWorker(writeQuantum time.Duration) {
 	worker.run()
 }
 
-func (w *bulkBroadcasterWorker) send(data []byte, targets []*ClientSocket) {
+func (w *bulkBroadcasterWorker) send(data []byte, targets []*ConnectedSocket) {
 	message := &broadcastMessage{data: data, targets: targets}
 	w.messageChannel <- message
 }

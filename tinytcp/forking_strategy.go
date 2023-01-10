@@ -18,7 +18,7 @@ type ForkingStrategy interface {
 	// OnAccept is called for every connection accepted by the server.
 	// The implementation should handle all the interactions with the socket,
 	// closing it after use and recovering from any potential panic.
-	OnAccept(socket *ClientSocket)
+	OnAccept(socket *ConnectedSocket)
 
 	// OnMetricsUpdate is called every time the server updates its metrics.
 	OnMetricsUpdate(metrics *ServerMetrics)
@@ -32,7 +32,7 @@ type ForkingStrategy interface {
 */
 
 type goroutinePerConnection struct {
-	handler    ClientSocketHandler
+	handler    ConnectedSocketHandler
 	goroutines int32
 }
 
@@ -49,7 +49,7 @@ func (g *goroutinePerConnection) OnMetricsUpdate(metrics *ServerMetrics) {
 	}
 }
 
-func (g *goroutinePerConnection) OnAccept(socket *ClientSocket) {
+func (g *goroutinePerConnection) OnAccept(socket *ConnectedSocket) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -78,7 +78,7 @@ func (g *goroutinePerConnection) OnAccept(socket *ClientSocket) {
 // It starts a new goroutine for every new connection. The handler associated with the connection will be responsible
 // for handling blocking operations on this connection.
 // Connections are automatically closed after their handler finishes.
-func GoroutinePerConnection(handler ClientSocketHandler) ForkingStrategy {
+func GoroutinePerConnection(handler ConnectedSocketHandler) ForkingStrategy {
 	return &goroutinePerConnection{
 		handler: handler,
 	}

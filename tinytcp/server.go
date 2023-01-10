@@ -15,12 +15,12 @@ type Server struct {
 	config                 *ServerConfig
 	listener               net.Listener
 	forkingStrategy        ForkingStrategy
-	sockets                map[*ClientSocket]struct{}
+	sockets                map[*ConnectedSocket]struct{}
 	socketsMutex           sync.RWMutex
 	ticker                 *time.Ticker
 	metrics                ServerMetrics
 	metricsUpdateHandler   func()
-	clientSocketPool       sync.Pool
+	connectedSocketPool    sync.Pool
 	byteCountingReaderPool sync.Pool
 	byteCountingWriterPool sync.Pool
 }
@@ -40,10 +40,10 @@ func NewServer(address string, opts ...ServerOpt) *Server {
 
 	return &Server{
 		config:  config,
-		sockets: make(map[*ClientSocket]struct{}),
-		clientSocketPool: sync.Pool{
+		sockets: make(map[*ConnectedSocket]struct{}),
+		connectedSocketPool: sync.Pool{
 			New: func() any {
-				return &ClientSocket{}
+				return &ConnectedSocket{}
 			},
 		},
 		byteCountingReaderPool: sync.Pool{
@@ -158,11 +158,11 @@ func (s *Server) Stop() {
 }
 
 // Sockets returns a list of all client sockets currently connected.
-func (s *Server) Sockets() []*ClientSocket {
+func (s *Server) Sockets() []*ConnectedSocket {
 	s.socketsMutex.RLock()
 	defer s.socketsMutex.RUnlock()
 
-	var list []*ClientSocket
+	var list []*ConnectedSocket
 	for socket := range s.sockets {
 		if !socket.IsClosed() {
 			list = append(list, socket)
@@ -183,28 +183,28 @@ func (s *Server) OnMetricsUpdate(handler func()) {
 }
 
 func (s *Server) handleNewConnection(connection net.Conn) {
-	clientSocket := s.newClientSocket(connection)
+	socket := s.newConnectedSocket(connection)
 
-	if registered := s.registerClientSocket(clientSocket); !registered {
+	if registered := s.registerConnectedSocket(socket); !registered {
 		// instantly terminate the connection if it can't be added to the server pool
-		_ = clientSocket.connection.Close()
-		s.recycleClientSocket(clientSocket)
+		_ = socket.connection.Close()
+		s.recycleConnectedSocket(socket)
 		return
 	}
 
-	log.Debug().Msgf("Opening TCP client connection: %s", clientSocket.connection.RemoteAddr().String())
+	log.Debug().Msgf("Opening TCP client connection: %s", socket.connection.RemoteAddr().String())
 
-	s.forkingStrategy.OnAccept(clientSocket)
+	s.forkingStrategy.OnAccept(socket)
 }
 
-func (s *Server) newClientSocket(connection net.Conn) *ClientSocket {
+func (s *Server) newConnectedSocket(connection net.Conn) *ConnectedSocket {
 	reader := s.byteCountingReaderPool.Get().(*byteCountingReader)
 	reader.reader = connection
 
 	writer := s.byteCountingWriterPool.Get().(*byteCountingWriter)
 	writer.writer = connection
 
-	cs := s.clientSocketPool.Get().(*ClientSocket)
+	cs := s.connectedSocketPool.Get().(*ConnectedSocket)
 	cs.remoteAddress = parseRemoteAddress(connection)
 	cs.connectedAt = time.Now()
 	cs.connection = connection
@@ -215,7 +215,7 @@ func (s *Server) newClientSocket(connection net.Conn) *ClientSocket {
 	return cs
 }
 
-func (s *Server) registerClientSocket(clientSocket *ClientSocket) bool {
+func (s *Server) registerConnectedSocket(socket *ConnectedSocket) bool {
 	s.socketsMutex.Lock()
 	defer s.socketsMutex.Unlock()
 
@@ -223,7 +223,7 @@ func (s *Server) registerClientSocket(clientSocket *ClientSocket) bool {
 		return false
 	}
 
-	s.sockets[clientSocket] = struct{}{}
+	s.sockets[socket] = struct{}{}
 	return true
 }
 
@@ -243,7 +243,7 @@ func (s *Server) startBackgroundJob() {
 		select {
 		case <-s.ticker.C:
 			s.updateMetrics()
-			s.cleanupClientSockets()
+			s.cleanupConnectedSockets()
 		}
 	}
 }
@@ -280,29 +280,29 @@ func (s *Server) updateMetrics() {
 	}
 }
 
-func (s *Server) cleanupClientSockets() {
+func (s *Server) cleanupConnectedSockets() {
 	s.socketsMutex.Lock()
 	defer s.socketsMutex.Unlock()
 
 	for socket := range s.sockets {
 		if socket.IsClosed() {
 			delete(s.sockets, socket)
-			s.recycleClientSocket(socket)
+			s.recycleConnectedSocket(socket)
 		}
 	}
 }
 
-func (s *Server) recycleClientSocket(clientSocket *ClientSocket) {
-	clientSocket.byteCountingReader.reader = nil
-	clientSocket.byteCountingReader.totalBytes = 0
-	clientSocket.byteCountingReader.currentBytes = 0
-	s.byteCountingReaderPool.Put(clientSocket.byteCountingReader)
+func (s *Server) recycleConnectedSocket(socket *ConnectedSocket) {
+	socket.byteCountingReader.reader = nil
+	socket.byteCountingReader.totalBytes = 0
+	socket.byteCountingReader.currentBytes = 0
+	s.byteCountingReaderPool.Put(socket.byteCountingReader)
 
-	clientSocket.byteCountingWriter.writer = nil
-	clientSocket.byteCountingWriter.totalBytes = 0
-	clientSocket.byteCountingWriter.currentBytes = 0
-	s.byteCountingWriterPool.Put(clientSocket.byteCountingWriter)
+	socket.byteCountingWriter.writer = nil
+	socket.byteCountingWriter.totalBytes = 0
+	socket.byteCountingWriter.currentBytes = 0
+	s.byteCountingWriterPool.Put(socket.byteCountingWriter)
 
-	clientSocket.reset()
-	s.clientSocketPool.Put(clientSocket)
+	socket.reset()
+	s.connectedSocketPool.Put(socket)
 }

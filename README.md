@@ -30,7 +30,6 @@ func main() {
 	httpServer := tinyhttp.NewServer(
 		config.String("http.address", "0.0.0.0:8080"),
 	)
-
 	httpServer.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "Hello world!",
@@ -40,9 +39,8 @@ func main() {
 	tcpServer := tinytcp.NewServer(
 		config.String("tcp.address", "0.0.0.0:7000"),
 	)
-
 	tcpServer.ForkingStrategy(tinytcp.GoroutinePerConnection(
-		func(socket *tinytcp.ClientSocket) {
+		func(socket *tinytcp.ConnectedSocket) {
 			socket.Write([]byte("Hello world!"))
 			socket.Close()
 		},
