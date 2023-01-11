@@ -59,10 +59,10 @@ func (cs *ConnectedSocket) IsClosed() bool {
 // Close closes TCP connection.
 func (cs *ConnectedSocket) Close() {
 	cs.closeOnce.Do(func() {
+		atomic.StoreUint32(&cs.isClosed, 1)
+
 		log.Debug().
 			Msgf("Closing TCP client connection: %s", cs.connection.RemoteAddr().String())
-
-		atomic.StoreUint32(&cs.isClosed, 1)
 
 		if err := cs.connection.Close(); err != nil {
 			log.Error().
