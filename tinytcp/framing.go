@@ -119,7 +119,7 @@ func PacketFramingHandler(
 
 			receivedBytes := readBuffer[:bytesRead]
 
-			if config.maxPacketSize > 0 && len(receiveBuffer)+len(receivedBytes) > config.maxPacketSize {
+			if config.maxPacketSize > 0 && len(receiveBuffer)+bytesRead > config.maxPacketSize {
 				receiveBuffer = nil
 				continue
 			}
