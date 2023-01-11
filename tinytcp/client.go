@@ -41,7 +41,7 @@ func DialTLS(address string, tlsConfig *tls.Config) (*Client, error) {
 }
 
 // Close closes the socket.
-func (c *Client) Close() {
+func (c *Client) Close() error {
 	c.closeSync.Do(func() {
 		err := c.connection.Close()
 		if err != nil {
@@ -52,6 +52,8 @@ func (c *Client) Close() {
 			c.onCloseHandler()
 		}
 	})
+
+	return nil
 }
 
 // Read conforms to the io.Reader interface.
@@ -59,7 +61,7 @@ func (c *Client) Read(b []byte) (int, error) {
 	n, err := c.connection.Read(b)
 	if err != nil {
 		if isBrokenPipe(err) {
-			c.Close()
+			_ = c.Close()
 		}
 
 		return n, err
@@ -73,7 +75,7 @@ func (c *Client) Write(b []byte) (int, error) {
 	n, err := c.connection.Write(b)
 	if err != nil {
 		if isBrokenPipe(err) {
-			c.Close()
+			_ = c.Close()
 		}
 
 		return n, err

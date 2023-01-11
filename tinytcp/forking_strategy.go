@@ -61,7 +61,7 @@ func (g *goroutinePerConnection) OnAccept(socket *ConnectedSocket) {
 		}()
 
 		defer func() {
-			socket.Close()
+			_ = socket.Close()
 			atomic.AddInt32(&g.goroutines, -1)
 		}()
 

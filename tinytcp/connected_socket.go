@@ -56,8 +56,9 @@ func (cs *ConnectedSocket) IsClosed() bool {
 	return atomic.LoadUint32(&cs.isClosed) == 1
 }
 
-// Close closes TCP connection.
-func (cs *ConnectedSocket) Close() {
+// Close closes underlying TCP connection and executes all the registered close handlers.
+// This method always returns nil, but its signature is meant to stick to the io.Closer interface.
+func (cs *ConnectedSocket) Close() error {
 	cs.closeOnce.Do(func() {
 		atomic.StoreUint32(&cs.isClosed, 1)
 
@@ -78,6 +79,8 @@ func (cs *ConnectedSocket) Close() {
 			handler()
 		}
 	})
+
+	return nil
 }
 
 // Read conforms to the io.Reader interface.
@@ -87,7 +90,7 @@ func (cs *ConnectedSocket) Read(b []byte) (int, error) {
 		if isBrokenPipe(err) {
 			log.Debug().
 				Msgf("Connection closed by TCP client: %s", cs.connection.RemoteAddr().String())
-			cs.Close()
+			_ = cs.Close()
 		} else if isTimeout(err) {
 			// ignore
 		} else {
@@ -109,7 +112,7 @@ func (cs *ConnectedSocket) Write(b []byte) (int, error) {
 		if isBrokenPipe(err) {
 			log.Debug().
 				Msgf("Connection closed by TCP client: %s", cs.connection.RemoteAddr().String())
-			cs.Close()
+			_ = cs.Close()
 		} else if isTimeout(err) {
 			// ignore
 		} else {
@@ -131,7 +134,7 @@ func (cs *ConnectedSocket) SetReadDeadline(deadline time.Time) error {
 		if isBrokenPipe(err) {
 			log.Debug().
 				Msgf("Connection closed by TCP client: %s", cs.connection.RemoteAddr().String())
-			cs.Close()
+			_ = cs.Close()
 		} else if isTimeout(err) {
 			// ignore
 		} else {
@@ -153,7 +156,7 @@ func (cs *ConnectedSocket) SetWriteDeadline(deadline time.Time) error {
 		if isBrokenPipe(err) {
 			log.Debug().
 				Msgf("Connection closed by TCP client: %s", cs.connection.RemoteAddr().String())
-			cs.Close()
+			_ = cs.Close()
 		} else if isTimeout(err) {
 			// ignore
 		} else {

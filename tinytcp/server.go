@@ -149,7 +149,7 @@ func (s *Server) Stop() {
 
 	sockets := s.Sockets()
 	for _, socket := range sockets {
-		socket.Close()
+		_ = socket.Close()
 	}
 
 	s.forkingStrategy.OnStop()
