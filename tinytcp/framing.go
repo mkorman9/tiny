@@ -11,15 +11,7 @@ type PacketHandler func(packet []byte)
 
 // PacketFramingContext represents an interface that lets user subscribe on packets incoming from ConnectedSocket.
 // Packet framing is specified by FramingProtocol passed to PacketFramingHandler.
-type PacketFramingContext interface {
-	// Socket returns underlying ConnectedSocket.
-	Socket() *ConnectedSocket
-
-	// OnPacket registers a handler that is run each time a packet is extracted from the read buffer.
-	OnPacket(handler PacketHandler)
-}
-
-type packetFramingContext struct {
+type PacketFramingContext struct {
 	socket  *ConnectedSocket
 	handler PacketHandler
 }
@@ -65,7 +57,7 @@ func MaxPacketSize(size int) PacketFramingOpt {
 // PacketFramingHandler returns a ConnectedSocketHandler that handles packet framing according to given FramingProtocol.
 func PacketFramingHandler(
 	framingProtocol FramingProtocol,
-	handler func(ctx PacketFramingContext),
+	handler func(ctx *PacketFramingContext),
 	opts ...PacketFramingOpt,
 ) ConnectedSocketHandler {
 	config := &PacketFramingConfig{
@@ -84,13 +76,13 @@ func PacketFramingHandler(
 		}
 		packetFramingContextPool = sync.Pool{
 			New: func() any {
-				return &packetFramingContext{}
+				return &PacketFramingContext{}
 			},
 		}
 	)
 
 	return func(socket *ConnectedSocket) {
-		ctx := packetFramingContextPool.Get().(*packetFramingContext)
+		ctx := packetFramingContextPool.Get().(*PacketFramingContext)
 		ctx.socket = socket
 		handler(ctx)
 
@@ -139,15 +131,17 @@ func PacketFramingHandler(
 	}
 }
 
-func (p *packetFramingContext) Socket() *ConnectedSocket {
+// Socket returns underlying ConnectedSocket.
+func (p *PacketFramingContext) Socket() *ConnectedSocket {
 	return p.socket
 }
 
-func (p *packetFramingContext) OnPacket(handler PacketHandler) {
+// OnPacket registers a handler that is run each time a packet is extracted from the read buffer.
+func (p *PacketFramingContext) OnPacket(handler PacketHandler) {
 	p.handler = handler
 }
 
-func (p *packetFramingContext) handlePacket(packet []byte) {
+func (p *PacketFramingContext) handlePacket(packet []byte) {
 	if p.handler != nil {
 		p.handler(packet)
 	}
