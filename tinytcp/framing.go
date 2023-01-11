@@ -88,7 +88,7 @@ func PacketFramingHandler(
 
 		var (
 			readBuffer    = readBufferPool.Get().([]byte)
-			receiveBuffer []byte
+			receiveBuffer *bytes.Buffer
 		)
 
 		defer func() {
@@ -109,23 +109,42 @@ func PacketFramingHandler(
 				continue
 			}
 
-			receivedBytes := readBuffer[:bytesRead]
-
-			if config.maxPacketSize > 0 && len(receiveBuffer)+bytesRead > config.maxPacketSize {
-				receiveBuffer = nil
-				continue
-			}
-
-			receiveBuffer = bytes.Join([][]byte{receiveBuffer, receivedBytes}, nil)
-
-			for {
-				packet, buff, ok := framingProtocol.ExtractPacket(receiveBuffer)
-				if !ok {
-					break
+			if config.maxPacketSize > 0 {
+				memoryNeeded := bytesRead
+				if receiveBuffer != nil {
+					memoryNeeded += receiveBuffer.Len()
 				}
 
-				receiveBuffer = buff
-				ctx.handlePacket(packet)
+				if memoryNeeded > config.maxPacketSize {
+					// packet too big
+					if receiveBuffer != nil {
+						receiveBuffer.Reset()
+					}
+					
+					continue
+				}
+			}
+
+			buffer := readBuffer[:bytesRead]
+			if receiveBuffer != nil && receiveBuffer.Len() > 0 {
+				receiveBuffer.Write(buffer)
+				buffer = receiveBuffer.Bytes()
+				receiveBuffer.Reset()
+			}
+
+			for {
+				packet, rest, extracted := framingProtocol.ExtractPacket(buffer)
+				if extracted {
+					buffer = rest
+					ctx.handlePacket(packet)
+				} else {
+					if receiveBuffer == nil {
+						receiveBuffer = &bytes.Buffer{}
+					}
+
+					receiveBuffer.Write(buffer)
+					break
+				}
 			}
 		}
 	}
