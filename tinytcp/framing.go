@@ -61,17 +61,23 @@ func PacketFramingHandler(
 	opts ...PacketFramingOpt,
 ) ConnectedSocketHandler {
 	config := &PacketFramingConfig{
-		readBufferSize: 4 * 1024,
-		maxPacketSize:  16 * 1024,
+		readBufferSize: 4 * 1024,  // 4 KiB
+		maxPacketSize:  16 * 1024, // 16 KiB
 	}
 	for _, opt := range opts {
 		opt(config)
 	}
 
+	// common buffers are pooled to avoid memory allocation in hot path
 	var (
 		readBufferPool = sync.Pool{
 			New: func() any {
 				return make([]byte, config.readBufferSize)
+			},
+		}
+		receiveBufferPool = sync.Pool{
+			New: func() any {
+				return &bytes.Buffer{}
 			},
 		}
 		packetFramingContextPool = sync.Pool{
@@ -84,10 +90,14 @@ func PacketFramingHandler(
 	return func(socket *ConnectedSocket) {
 		ctx := packetFramingContextPool.Get().(*PacketFramingContext)
 		ctx.socket = socket
+
 		handler(ctx)
 
 		var (
-			readBuffer    = readBufferPool.Get().([]byte)
+			// readBuffer is a fixed-size page, which is never reallocated. Socket pumps data straight into it.
+			readBuffer = readBufferPool.Get().([]byte)
+
+			// receiveBuffer is used to hold data between consecutive Read() calls in case a packet is fragmented.
 			receiveBuffer *bytes.Buffer
 		)
 
@@ -97,6 +107,11 @@ func PacketFramingHandler(
 			ctx.socket = nil
 			ctx.handler = nil
 			packetFramingContextPool.Put(ctx)
+
+			if receiveBuffer != nil {
+				receiveBuffer.Reset()
+				receiveBufferPool.Put(receiveBuffer)
+			}
 		}()
 
 		for {
@@ -109,6 +124,7 @@ func PacketFramingHandler(
 				continue
 			}
 
+			// validate packet size
 			if config.maxPacketSize > 0 {
 				memoryNeeded := bytesRead
 				if receiveBuffer != nil {
@@ -120,11 +136,12 @@ func PacketFramingHandler(
 					if receiveBuffer != nil {
 						receiveBuffer.Reset()
 					}
-					
+
 					continue
 				}
 			}
 
+			// include data from past iteration if receive buffer is not empty
 			buffer := readBuffer[:bytesRead]
 			if receiveBuffer != nil && receiveBuffer.Len() > 0 {
 				receiveBuffer.Write(buffer)
@@ -135,11 +152,13 @@ func PacketFramingHandler(
 			for {
 				packet, rest, extracted := framingProtocol.ExtractPacket(buffer)
 				if extracted {
+					// fast path - packet is extracted straight from the readBuffer, without memory allocations
 					buffer = rest
 					ctx.handlePacket(packet)
 				} else {
+					// slow path - packet is fragmented, memory allocation needed
 					if receiveBuffer == nil {
-						receiveBuffer = &bytes.Buffer{}
+						receiveBuffer = receiveBufferPool.Get().(*bytes.Buffer)
 					}
 
 					receiveBuffer.Write(buffer)
