@@ -2,8 +2,8 @@ package tiny
 
 import (
 	"github.com/gookit/config/v2"
-	"github.com/gookit/config/v2/hcl"
 	"github.com/gookit/config/v2/json"
+	"github.com/gookit/config/v2/toml"
 	"github.com/gookit/config/v2/yamlv3"
 	"github.com/rs/zerolog/log"
 	"os"
@@ -19,7 +19,7 @@ func LoadConfig(files ...string) (loaded bool) {
 	if len(files) > 0 {
 		config.AddDriver(yamlv3.Driver)
 		config.AddDriver(json.Driver)
-		config.AddDriver(hcl.Driver)
+		config.AddDriver(toml.Driver)
 
 		err := config.LoadFiles(files...)
 		if err != nil {
