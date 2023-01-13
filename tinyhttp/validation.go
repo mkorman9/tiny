@@ -1,12 +1,13 @@
 package tinyhttp
 
-/*
 import (
-	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
 	"reflect"
 	"strings"
 )
+
+// DefaultValidator is the default instance of validator.Validate.
+var DefaultValidator = validator.New()
 
 // ValidationError denotes an error in payload validation.
 type ValidationError struct {
@@ -34,29 +35,27 @@ func ExtractValidatorErrors(err error) []ValidationError {
 }
 
 func init() {
-	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-		v.RegisterTagNameFunc(func(field reflect.StructField) string {
-			fieldName := resolveTag(field, "json")
+	DefaultValidator.RegisterTagNameFunc(func(field reflect.StructField) string {
+		fieldName := resolveTag(field, "json")
 
-			if fieldName == "" {
-				fieldName = resolveTag(field, "form")
-			}
+		if fieldName == "" {
+			fieldName = resolveTag(field, "form")
+		}
 
-			if fieldName == "" {
-				fieldName = resolveTag(field, "header")
-			}
+		if fieldName == "" {
+			fieldName = resolveTag(field, "header")
+		}
 
-			if fieldName == "" {
-				fieldName = resolveTag(field, "uri")
-			}
+		if fieldName == "" {
+			fieldName = resolveTag(field, "uri")
+		}
 
-			if fieldName == "" {
-				fieldName = field.Name
-			}
+		if fieldName == "" {
+			fieldName = field.Name
+		}
 
-			return fieldName
-		})
-	}
+		return fieldName
+	})
 }
 
 func extractFieldName(fieldError validator.FieldError) string {
@@ -77,4 +76,3 @@ func resolveTag(field reflect.StructField, tag string) string {
 
 	return name
 }
-*/
