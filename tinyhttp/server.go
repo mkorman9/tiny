@@ -14,9 +14,9 @@ import (
 type Server struct {
 	*fiber.App
 
-	config         *ServerConfig
-	noRouteHandler func(c *fiber.Ctx)
-	panicHandler   func(c *fiber.Ctx, recovered any)
+	config       *ServerConfig
+	errorHandler func(c *fiber.Ctx, err error) error
+	panicHandler func(c *fiber.Ctx, recovered any)
 }
 
 // NewServer creates new Server instance.
@@ -73,14 +73,19 @@ func (s *Server) Stop() {
 	}
 }
 
-// OnPanic sets a handler for requests that resulted in panic and would end up as 500s.
+// OnPanic sets a handler for requests that resulted in panic.
 func (s *Server) OnPanic(handler func(c *fiber.Ctx, recovered any)) {
 	s.panicHandler = handler
 }
 
+// OnError sets a handler for requests that resulted in error.
+func (s *Server) OnError(handler func(c *fiber.Ctx, err error) error) {
+	s.errorHandler = handler
+}
+
 func (s *Server) createApp() *fiber.App {
 	appConfig := fiber.Config{
-		ErrorHandler:          s.errorHandler,
+		ErrorHandler:          s.errorFunction,
 		Network:               s.config.Network,
 		ReadTimeout:           s.config.ReadTimeout,
 		WriteTimeout:          s.config.WriteTimeout,
@@ -110,7 +115,11 @@ func (s *Server) createApp() *fiber.App {
 	return app
 }
 
-func (s *Server) errorHandler(ctx *fiber.Ctx, err error) error {
+func (s *Server) errorFunction(c *fiber.Ctx, err error) error {
+	if s.errorHandler != nil {
+		return s.errorHandler(c, err)
+	}
+
 	code := http.StatusInternalServerError
 
 	var fiberErr *fiber.Error
@@ -118,22 +127,20 @@ func (s *Server) errorHandler(ctx *fiber.Ctx, err error) error {
 		code = fiberErr.Code
 	}
 
-	ctx.Status(code)
+	c.Status(code)
 	return nil
 }
 
 func (s *Server) recoveryFunction(c *fiber.Ctx, recovered any) {
-	log.Error().
-		Stack().
-		Err(fmt.Errorf("%v", recovered)).
-		Msg("Panic inside an HTTP handler function")
-
 	if s.panicHandler != nil {
 		s.panicHandler(c, recovered)
 		return
 	}
 
-	c.Status(http.StatusInternalServerError)
+	log.Error().
+		Stack().
+		Err(fmt.Errorf("%v", recovered)).
+		Msg("Panic inside an HTTP handler function")
 }
 
 func (s *Server) securityHeadersFunction(c *fiber.Ctx) error {
