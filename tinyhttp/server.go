@@ -80,11 +80,13 @@ func (s *Server) OnPanic(handler func(c *fiber.Ctx, recovered any)) {
 
 func (s *Server) createApp() *fiber.App {
 	appConfig := fiber.Config{
-		ErrorHandler: s.errorHandler,
-		Network:      s.config.Network,
-		ReadTimeout:  s.config.ReadTimeout,
-		WriteTimeout: s.config.WriteTimeout,
-		IdleTimeout:  s.config.IdleTimeout,
+		ErrorHandler:          s.errorHandler,
+		Network:               s.config.Network,
+		ReadTimeout:           s.config.ReadTimeout,
+		WriteTimeout:          s.config.WriteTimeout,
+		IdleTimeout:           s.config.IdleTimeout,
+		DisableStartupMessage: true,
+		EnablePrintRoutes:     false,
 	}
 
 	if len(s.config.TrustedProxies) > 0 {
