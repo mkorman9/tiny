@@ -2,6 +2,7 @@ package tinyhttp
 
 import (
 	"github.com/go-playground/validator/v10"
+	"github.com/gofiber/fiber/v2"
 	"reflect"
 	"strings"
 )
@@ -16,6 +17,21 @@ type ValidationError struct {
 
 	// Tag is a name of the tag that trigger an error.
 	Tag string `json:"tag"`
+}
+
+// BindBody tries to parse provided request body and validate resulting object using the DefaultValidator.
+func BindBody(c *fiber.Ctx, out any) []ValidationError {
+	if err := c.BodyParser(out); err != nil {
+		return []ValidationError{
+			{Field: "body", Tag: "json"},
+		}
+	}
+
+	if err := DefaultValidator.Struct(out); err != nil {
+		return ExtractValidatorErrors(err)
+	}
+
+	return nil
 }
 
 // ExtractValidatorErrors tries to extract an array of ValidationError from given error.
