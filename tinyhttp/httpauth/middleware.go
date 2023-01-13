@@ -1,7 +1,7 @@
 package httpauth
 
 import (
-	"github.com/gin-gonic/gin"
+	"github.com/gofiber/fiber/v2"
 	"net/http"
 )
 
@@ -20,11 +20,11 @@ type VerificationResult struct {
 	SessionData any
 }
 
-type middlewareAction = func(*gin.Context) (*VerificationResult, error)
+type middlewareAction = func(*fiber.Ctx) (*VerificationResult, error)
 type rolesCheckingFunc = func(roles []string) bool
 
 // Middleware is an interface that represents a generic authorization middleware.
-// It provides user-friendly API that can be easily integrated with existing Gin request handlers.
+// It provides user-friendly API that can be easily integrated with existing fiber request handlers.
 // Underlying implementation might utilize Basic Auth, Bearer-Token or other mechanisms but this API is transparent.
 type Middleware struct {
 	action middlewareAction
@@ -39,7 +39,7 @@ func newMiddleware(action middlewareAction, config *MiddlewareConfig) *Middlewar
 }
 
 // Authenticated enables access to all authenticated clients, no matter the roles.
-func (m *Middleware) Authenticated() gin.HandlerFunc {
+func (m *Middleware) Authenticated() fiber.Handler {
 	checkRoles := func(_ []string) bool {
 		return true
 	}
@@ -48,7 +48,7 @@ func (m *Middleware) Authenticated() gin.HandlerFunc {
 }
 
 // AnyOfRoles enables access to only those clients who have at least one of the given roles associated with them.
-func (m *Middleware) AnyOfRoles(allowedRoles ...string) gin.HandlerFunc {
+func (m *Middleware) AnyOfRoles(allowedRoles ...string) fiber.Handler {
 	allowedRolesSet := make(map[string]struct{})
 	for _, role := range allowedRoles {
 		allowedRolesSet[role] = struct{}{}
@@ -68,7 +68,7 @@ func (m *Middleware) AnyOfRoles(allowedRoles ...string) gin.HandlerFunc {
 }
 
 // AllOfRoles enables access to only those clients who have all specified roles associated with them.
-func (m *Middleware) AllOfRoles(requiredRoles ...string) gin.HandlerFunc {
+func (m *Middleware) AllOfRoles(requiredRoles ...string) fiber.Handler {
 	checkRoles := func(providedRoles []string) bool {
 		for _, role := range requiredRoles {
 			hasRole := false
@@ -94,41 +94,38 @@ func (m *Middleware) authorize(
 	action middlewareAction,
 	config *MiddlewareConfig,
 	checkRoles rolesCheckingFunc,
-) gin.HandlerFunc {
-	return func(c *gin.Context) {
+) fiber.Handler {
+	return func(c *fiber.Ctx) error {
 		verificationResult, err := action(c)
 		if err != nil {
 			if config.errorHandler != nil {
-				config.errorHandler(c, err)
-				return
+				return config.errorHandler(c, err)
 			}
 
-			c.AbortWithStatus(http.StatusInternalServerError)
-			return
+			c.Status(http.StatusInternalServerError)
+			return nil
 		}
 
 		if !verificationResult.Verified {
 			if config.unverifiedHandler != nil {
-				config.unverifiedHandler(c)
-				return
+				return config.unverifiedHandler(c)
 			}
 
-			c.AbortWithStatus(http.StatusUnauthorized)
-			return
+			c.Status(http.StatusUnauthorized)
+			return nil
 		}
 
 		rolesCheckingResult := checkRoles(verificationResult.Roles)
 		if !rolesCheckingResult {
 			if config.accessDeniedHandler != nil {
-				config.accessDeniedHandler(c)
-				return
+				return config.accessDeniedHandler(c)
 			}
 
-			c.AbortWithStatus(http.StatusForbidden)
-			return
+			c.Status(http.StatusForbidden)
+			return nil
 		}
 
 		setSessionData(c, verificationResult.SessionData)
-		c.Next()
+		return c.Next()
 	}
 }

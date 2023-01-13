@@ -1,5 +1,6 @@
 package tinyhttp
 
+/*
 import (
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
@@ -76,3 +77,4 @@ func resolveTag(field reflect.StructField, tag string) string {
 
 	return name
 }
+*/

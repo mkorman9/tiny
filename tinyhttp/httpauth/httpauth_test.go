@@ -1,12 +1,12 @@
 package httpauth
 
 import (
-	"github.com/gin-gonic/gin"
+	"github.com/gofiber/fiber/v2"
 	"github.com/mkorman9/tiny"
 	"github.com/mkorman9/tiny/tinyhttp"
 	"github.com/stretchr/testify/assert"
+	"io"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 )
 
@@ -16,110 +16,138 @@ func init() {
 
 func TestMissingToken(t *testing.T) {
 	// given
-	responsePayload := "payload"
+	payload := "payload"
 	correctToken := "token"
 
 	middleware := createBearerTokenMiddleware(correctToken)
 
-	engine := tinyhttp.NewServer("address").Engine
-	engine.GET(
+	app := tinyhttp.NewServer("address").App
+	app.Get(
 		"/secured",
 		middleware.AnyOfRoles("ADMIN"),
-		func(c *gin.Context) {
-			c.String(http.StatusOK, responsePayload)
+		func(c *fiber.Ctx) error {
+			return c.Status(http.StatusOK).
+				SendString(payload)
 		},
 	)
 
 	// when
-	recorder := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/secured", nil)
-	engine.ServeHTTP(recorder, req)
+
+	response, err := app.Test(req, -1)
+	if err != nil {
+		assert.Error(t, err)
+		return
+	}
 
 	// then
-	assert.Equal(t, http.StatusUnauthorized, recorder.Code, "response code should be 401")
+	assert.Equal(t, http.StatusUnauthorized, response.StatusCode, "response code should be 401")
 }
 
 func TestInvalidToken(t *testing.T) {
 	// given
-	responsePayload := "payload"
+	payload := "payload"
 	correctToken := "token"
 
 	middleware := createBearerTokenMiddleware(correctToken)
 
-	engine := tinyhttp.NewServer("address").Engine
-	engine.GET(
+	app := tinyhttp.NewServer("address").App
+	app.Get(
 		"/secured",
 		middleware.AnyOfRoles("ADMIN"),
-		func(c *gin.Context) {
-			c.String(http.StatusOK, responsePayload)
+		func(c *fiber.Ctx) error {
+			return c.Status(http.StatusOK).
+				SendString(payload)
 		},
 	)
 
 	// when
-	recorder := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/secured", nil)
 	req.Header.Set("Authorization", "Bearer incorrectToken")
-	engine.ServeHTTP(recorder, req)
+
+	response, err := app.Test(req, -1)
+	if err != nil {
+		assert.Error(t, err)
+		return
+	}
 
 	// then
-	assert.Equal(t, http.StatusUnauthorized, recorder.Code, "response code should be 401")
+	assert.Equal(t, http.StatusUnauthorized, response.StatusCode, "response code should be 401")
 }
 
 func TestValidToken(t *testing.T) {
 	// given
-	responsePayload := "payload"
+	payload := "payload"
 	correctToken := "token"
 
 	middleware := createBearerTokenMiddleware(correctToken)
 
-	engine := tinyhttp.NewServer("address").Engine
-	engine.GET(
+	app := tinyhttp.NewServer("address").App
+	app.Get(
 		"/secured",
 		middleware.AnyOfRoles("ADMIN"),
-		func(c *gin.Context) {
-			c.String(http.StatusOK, responsePayload)
+		func(c *fiber.Ctx) error {
+			return c.Status(http.StatusOK).
+				SendString(payload)
 		},
 	)
 
 	// when
-	recorder := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/secured", nil)
 	req.Header.Set("Authorization", "Bearer "+correctToken)
-	engine.ServeHTTP(recorder, req)
+
+	response, err := app.Test(req, -1)
+	if err != nil {
+		assert.Error(t, err)
+		return
+	}
+
+	defer response.Body.Close()
+
+	responseBody, err := io.ReadAll(response.Body)
+	if err != nil {
+		assert.Error(t, err)
+		return
+	}
 
 	// then
-	assert.Equal(t, http.StatusOK, recorder.Code, "response code should be 200")
-	assert.Equal(t, []byte(responsePayload), recorder.Body.Bytes(), "response payload should match")
+	assert.Equal(t, http.StatusOK, response.StatusCode, "response code should be 200")
+	assert.Equal(t, []byte(payload), responseBody, "response payload should match")
 }
 
 func TestInvalidRoles(t *testing.T) {
 	// given
-	responsePayload := "payload"
+	payload := "payload"
 	correctToken := "token"
 
 	middleware := createBearerTokenMiddleware(correctToken)
 
-	engine := tinyhttp.NewServer("address").Engine
-	engine.GET(
+	app := tinyhttp.NewServer("address").App
+	app.Get(
 		"/secured",
 		middleware.AnyOfRoles("SUPERUSER"),
-		func(c *gin.Context) {
-			c.String(http.StatusOK, responsePayload)
+		func(c *fiber.Ctx) error {
+			return c.Status(http.StatusOK).
+				SendString(payload)
 		},
 	)
 
 	// when
-	recorder := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/secured", nil)
 	req.Header.Set("Authorization", "Bearer "+correctToken)
-	engine.ServeHTTP(recorder, req)
+
+	response, err := app.Test(req, -1)
+	if err != nil {
+		assert.Error(t, err)
+		return
+	}
 
 	// then
-	assert.Equal(t, http.StatusForbidden, recorder.Code, "response code should be 403")
+	assert.Equal(t, http.StatusForbidden, response.StatusCode, "response code should be 403")
 }
 
 func createBearerTokenMiddleware(correctToken string) *Middleware {
-	return NewBearerTokenMiddleware(func(c *gin.Context, token string) (*VerificationResult, error) {
+	return NewBearerTokenMiddleware(func(c *fiber.Ctx, token string) (*VerificationResult, error) {
 		if token == correctToken {
 			return &VerificationResult{Verified: true, Roles: []string{"ADMIN"}}, nil
 		} else {

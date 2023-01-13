@@ -1,12 +1,12 @@
 package httpauth
 
 import (
-	"github.com/gin-gonic/gin"
+	"github.com/gofiber/fiber/v2"
 	"strings"
 )
 
 // VerifyTokenFunc is a user-provided function that is called in able to validate given API token.
-type VerifyTokenFunc = func(c *gin.Context, token string) (*VerificationResult, error)
+type VerifyTokenFunc = func(c *fiber.Ctx, token string) (*VerificationResult, error)
 
 // NewBearerTokenMiddleware creates new bearer-token based Middleware.
 // This middleware reads Authorization header and expects it to begin with "Bearer" string.
@@ -17,7 +17,7 @@ func NewBearerTokenMiddleware(verifyToken VerifyTokenFunc, opts ...MiddlewareOpt
 	}
 
 	return newMiddleware(
-		func(c *gin.Context) (*VerificationResult, error) {
+		func(c *fiber.Ctx) (*VerificationResult, error) {
 			token := extractToken(c)
 			return verifyToken(c, token)
 		},
@@ -25,8 +25,8 @@ func NewBearerTokenMiddleware(verifyToken VerifyTokenFunc, opts ...MiddlewareOpt
 	)
 }
 
-func extractToken(c *gin.Context) string {
-	authorizationHeader := c.GetHeader("Authorization")
+func extractToken(c *fiber.Ctx) string {
+	authorizationHeader := c.Get("Authorization")
 	if len(authorizationHeader) == 0 {
 		return ""
 	}

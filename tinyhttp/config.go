@@ -1,7 +1,6 @@
 package tinyhttp
 
 import (
-	"crypto/tls"
 	"time"
 )
 
@@ -12,14 +11,8 @@ type ServerConfig struct {
 	// Network is a network type for the listener (default: "tcp").
 	Network string
 
-	// GinMode defines working mode of the Gin library (default: Release).
-	GinMode string
-
 	// SecurityHeaders defines whether to include HTTP security headers to all responses or not (default: true).
 	SecurityHeaders bool
-
-	// MethodNotAllowed defines whether the library handles method not allowed errors (default: false).
-	MethodNotAllowed bool
 
 	// ShutdownTimeout defines a maximal timeout of HTTP server shutdown (default: 5s).
 	ShutdownTimeout time.Duration
@@ -30,14 +23,8 @@ type ServerConfig struct {
 	// TLSKey is a path to TLS key to use. When specified with TLSCert - enables TLS mode.
 	TLSKey string
 
-	// TLSConfig is an optional TLS configuration to pass when using TLS mode.
-	TLSConfig *tls.Config
-
 	// ReadTimeout is a timeout used when creating underlying http server (see http.Server) (default: 5s).
 	ReadTimeout time.Duration
-
-	// ReadHeaderTimeout is a timeout used when creating underlying http server (see http.Server).
-	ReadHeaderTimeout time.Duration
 
 	// WriteTimeout is a timeout used when creating underlying http server (see http.Server) (default: 10s).
 	WriteTimeout time.Duration
@@ -45,16 +32,13 @@ type ServerConfig struct {
 	// IdleTimeout is a timeout used when creating underlying http server (see http.Server) (default 2m).
 	IdleTimeout time.Duration
 
-	// MaxHeaderBytes is a value used when creating underlying http server (see http.Server).
-	MaxHeaderBytes int
-
 	// TrustedProxies is a list of CIDR address ranges that can be trusted when handling RemoteIP header.
 	// (default: "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8", "fc00::/7", "::1/128")
 	TrustedProxies []string
 
 	// RemoteIPHeaders is a list of headers that overwrite the value of client's remote address.
 	// (default: "X-Forwarded-For")
-	RemoteIPHeaders []string
+	RemoteIPHeader string
 }
 
 // ServerOpt is an option to be specified to NewServer.
@@ -67,24 +51,10 @@ func Network(network string) ServerOpt {
 	}
 }
 
-// GinMode defines working mode of the Gin library.
-func GinMode(mode string) ServerOpt {
-	return func(config *ServerConfig) {
-		config.GinMode = mode
-	}
-}
-
 // SecurityHeaders defines whether to include HTTP security headers to all responses or not.
 func SecurityHeaders(securityHeaders bool) ServerOpt {
 	return func(config *ServerConfig) {
 		config.SecurityHeaders = securityHeaders
-	}
-}
-
-// MethodNotAllowed defines whether the library handles method not allowed errors.
-func MethodNotAllowed(methodNotAllowed bool) ServerOpt {
-	return func(config *ServerConfig) {
-		config.MethodNotAllowed = methodNotAllowed
 	}
 }
 
@@ -95,15 +65,11 @@ func ShutdownTimeout(timeout time.Duration) ServerOpt {
 	}
 }
 
-// TLS enables TLS mode if both cert and key point to valid TLS credentials. tlsConfig is optional.
-func TLS(cert, key string, tlsConfig ...*tls.Config) ServerOpt {
+// TLS enables TLS mode if both cert and key point to valid TLS credentials.
+func TLS(cert, key string) ServerOpt {
 	return func(config *ServerConfig) {
 		config.TLSCert = cert
 		config.TLSKey = key
-
-		if len(tlsConfig) > 0 {
-			config.TLSConfig = tlsConfig[0]
-		}
 	}
 }
 
@@ -111,13 +77,6 @@ func TLS(cert, key string, tlsConfig ...*tls.Config) ServerOpt {
 func ReadTimeout(timeout time.Duration) ServerOpt {
 	return func(config *ServerConfig) {
 		config.ReadTimeout = timeout
-	}
-}
-
-// ReadHeaderTimeout is a timeout used when creating underlying http server (see http.Server).
-func ReadHeaderTimeout(timeout time.Duration) ServerOpt {
-	return func(config *ServerConfig) {
-		config.ReadHeaderTimeout = timeout
 	}
 }
 
@@ -135,13 +94,6 @@ func IdleTimeout(timeout time.Duration) ServerOpt {
 	}
 }
 
-// MaxHeaderBytes is a value used when creating underlying http server (see http.Server).
-func MaxHeaderBytes(maxHeaderBytes int) ServerOpt {
-	return func(config *ServerConfig) {
-		config.MaxHeaderBytes = maxHeaderBytes
-	}
-}
-
 // TrustedProxies is a list of CIDR address ranges that can be trusted when handling RemoteIP header.
 func TrustedProxies(trustedProxies []string) ServerOpt {
 	return func(config *ServerConfig) {
@@ -149,9 +101,9 @@ func TrustedProxies(trustedProxies []string) ServerOpt {
 	}
 }
 
-// RemoteIPHeaders is a list of headers that overwrite the value of client's remote address.
-func RemoteIPHeaders(headers []string) ServerOpt {
+// RemoteIPHeader is a name of the header that overwrites the value of client's remote address.
+func RemoteIPHeader(header string) ServerOpt {
 	return func(config *ServerConfig) {
-		config.RemoteIPHeaders = headers
+		config.RemoteIPHeader = header
 	}
 }

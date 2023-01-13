@@ -16,7 +16,7 @@ go get github.com/mkorman9/tiny
 package main
 
 import (
-	"github.com/gin-gonic/gin"
+	"github.com/gofiber/fiber/v2"
 	"github.com/gookit/config/v2"
 	"github.com/mkorman9/tiny"
 	"github.com/mkorman9/tiny/tinyhttp"
@@ -30,10 +30,11 @@ func main() {
 	httpServer := tinyhttp.NewServer(
 		config.String("http.address", "0.0.0.0:8080"),
 	)
-	httpServer.GET("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Hello world!",
-		})
+	httpServer.Get("/", func(c *fiber.Ctx) error {
+		return c.Status(http.StatusOK).
+			JSON(fiber.Map{
+			    "message": "Hello world!",
+			})
 	})
 
 	tcpServer := tinytcp.NewServer(

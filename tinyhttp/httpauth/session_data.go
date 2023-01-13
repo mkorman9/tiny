@@ -1,23 +1,25 @@
 package httpauth
 
-import "github.com/gin-gonic/gin"
+import (
+	"github.com/gofiber/fiber/v2"
+)
 
 const sessionDataContextKey = "httpauth/sessionData"
 
 // GetSessionData tries to extract session data set by middleware from the request's context.
-func GetSessionData(c *gin.Context) (any, bool) {
-	return c.Get(sessionDataContextKey)
+func GetSessionData(c *fiber.Ctx) any {
+	return c.Context().UserValue(sessionDataContextKey)
 }
 
 // MustGetSessionData extracts session data set by middleware from the request's context, or panics.
-func MustGetSessionData(c *gin.Context) any {
-	if v, ok := GetSessionData(c); ok {
+func MustGetSessionData(c *fiber.Ctx) any {
+	if v := GetSessionData(c); v != nil {
 		return v
 	}
 
 	panic("MustGetSessionData() expected session data to be present")
 }
 
-func setSessionData(c *gin.Context, sessionData any) {
-	c.Set(sessionDataContextKey, sessionData)
+func setSessionData(c *fiber.Ctx, sessionData any) {
+	c.Context().SetUserValue(sessionDataContextKey, sessionData)
 }
