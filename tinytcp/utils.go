@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"strings"
 	"syscall"
 )
 
@@ -38,18 +39,13 @@ const (
 )
 
 func isBrokenPipe(err error) bool {
-	result := false
-
-	if err == io.EOF || errors.Is(err, syscall.ECONNRESET) {
-		result = true
-	} else if netOpError, ok := err.(*net.OpError); ok {
-		if netOpError.Err.Error() == "use of closed network connection" ||
-			netOpError.Err.Error() == "wsarecv: An existing connection was forcibly closed by the remote host." {
-			result = true
-		}
-	}
-
-	return result
+	return err == io.EOF ||
+		errors.Is(err, syscall.ECONNRESET) ||
+		strings.Contains(err.Error(), "use of closed network connection") ||
+		strings.Contains(err.Error(), "wsarecv: An existing connection was forcibly closed by the remote host.") ||
+		strings.Contains(err.Error(), "broken pipe") ||
+		strings.Contains(err.Error(), "reset by peer") ||
+		strings.Contains(err.Error(), "unexpected EOF")
 }
 
 func isTimeout(err error) bool {
