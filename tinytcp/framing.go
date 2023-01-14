@@ -164,25 +164,25 @@ func PacketFramingHandler(
 			}
 
 			// include data from past iteration if receive buffer is not empty
-			buffer := readBuffer[leftOffset : rightOffset+bytesRead]
+			source := readBuffer[leftOffset : rightOffset+bytesRead]
 			if receiveBuffer != nil && receiveBuffer.Len() > 0 {
-				receiveBuffer.Write(buffer)
-				buffer = receiveBuffer.Bytes()
+				receiveBuffer.Write(source)
+				source = receiveBuffer.Bytes()
 				receiveBuffer.Reset()
 			}
 
 			extractedAnything := false
 			for {
-				packet, rest, extracted := framingProtocol.ExtractPacket(buffer)
+				packet, rest, extracted := framingProtocol.ExtractPacket(source)
 				if extracted {
 					// fast path - packet is extracted straight from the readBuffer, without memory allocations
-					buffer = rest
+					source = rest
 					leftOffset += len(packet)
 					rightOffset += len(packet)
 					extractedAnything = true
 					ctx.handlePacket(packet)
 				} else {
-					if extractedAnything && len(buffer) == 0 {
+					if extractedAnything && len(source) == 0 {
 						leftOffset = 0
 						rightOffset = 0
 						break
@@ -190,18 +190,18 @@ func PacketFramingHandler(
 
 					// packet is fragmented
 
-					if rightOffset+bytesRead > len(readBuffer)-config.minReadSpace {
+					if rightOffset+len(source) > len(readBuffer)-config.minReadSpace {
 						// slow path - memory allocation needed
 						if receiveBuffer == nil {
 							receiveBuffer = receiveBufferPool.Get().(*bytes.Buffer)
 						}
 
-						receiveBuffer.Write(buffer)
+						receiveBuffer.Write(source)
 						leftOffset = 0
 						rightOffset = 0
 					} else {
 						// we'll still fit another Read() into read buffer
-						rightOffset += len(buffer)
+						rightOffset += len(source)
 					}
 
 					break
