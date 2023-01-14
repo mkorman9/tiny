@@ -171,7 +171,6 @@ func PacketFramingHandler(
 				receiveBuffer.Reset()
 			}
 
-			extractedAnything := false
 			for {
 				packet, rest, extracted := framingProtocol.ExtractPacket(source)
 				if extracted {
@@ -179,10 +178,9 @@ func PacketFramingHandler(
 					source = rest
 					leftOffset += len(packet)
 					rightOffset += len(packet)
-					extractedAnything = true
 					ctx.handlePacket(packet)
 				} else {
-					if extractedAnything && len(source) == 0 {
+					if len(source) == 0 {
 						leftOffset = 0
 						rightOffset = 0
 						break
