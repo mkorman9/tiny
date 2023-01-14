@@ -45,7 +45,7 @@ func TLS(cert, key string, tlsConfig ...*tls.Config) ServerOpt {
 		config.TLSCert = cert
 		config.TLSKey = key
 
-		if len(tlsConfig) > 0 {
+		if tlsConfig != nil {
 			config.TLSConfig = tlsConfig[0]
 		}
 	}

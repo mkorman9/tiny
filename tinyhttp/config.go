@@ -1,6 +1,7 @@
 package tinyhttp
 
 import (
+	"crypto/tls"
 	"github.com/gofiber/fiber/v2"
 	"time"
 )
@@ -23,6 +24,9 @@ type ServerConfig struct {
 
 	// TLSKey is a path to TLS key to use. When specified with TLSCert - enables TLS mode.
 	TLSKey string
+
+	// TLSConfig is an optional TLS configuration to pass when using TLS mode.
+	TLSConfig *tls.Config
 
 	// ReadTimeout is a timeout used when creating underlying http server (default: 5s).
 	ReadTimeout time.Duration
@@ -84,10 +88,14 @@ func ShutdownTimeout(timeout time.Duration) ServerOpt {
 }
 
 // TLS enables TLS mode if both cert and key point to valid TLS credentials.
-func TLS(cert, key string) ServerOpt {
+func TLS(cert, key string, tlsConfig ...*tls.Config) ServerOpt {
 	return func(config *ServerConfig) {
 		config.TLSCert = cert
 		config.TLSKey = key
+
+		if tlsConfig != nil {
+			config.TLSConfig = tlsConfig[0]
+		}
 	}
 }
 

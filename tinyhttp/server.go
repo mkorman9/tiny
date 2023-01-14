@@ -1,12 +1,14 @@
 package tinyhttp
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/rs/zerolog/log"
+	"net"
 	"time"
 )
 
@@ -25,6 +27,7 @@ func NewServer(address string, opts ...ServerOpt) *Server {
 		address:         address,
 		Network:         "tcp",
 		SecurityHeaders: true,
+		TLSConfig:       &tls.Config{},
 		ShutdownTimeout: 5 * time.Second,
 		ReadTimeout:     5 * time.Second,
 		WriteTimeout:    10 * time.Second,
@@ -57,14 +60,32 @@ func NewServer(address string, opts ...ServerOpt) *Server {
 func (s *Server) Start() error {
 	log.Info().Msgf("HTTP server started (%s)", s.config.address)
 
-	var err error
+	var listener net.Listener
+
 	if s.config.TLSCert != "" && s.config.TLSKey != "" {
-		err = s.ListenTLS(s.config.address, s.config.TLSCert, s.config.TLSKey)
+		cert, err := tls.LoadX509KeyPair(s.config.TLSCert, s.config.TLSKey)
+		if err != nil {
+			return err
+		}
+
+		s.config.TLSConfig.Certificates = []tls.Certificate{cert}
+
+		socket, err := tls.Listen(s.config.Network, s.config.address, s.config.TLSConfig)
+		if err != nil {
+			return err
+		}
+
+		listener = socket
 	} else {
-		err = s.Listen(s.config.address)
+		socket, err := net.Listen(s.config.Network, s.config.address)
+		if err != nil {
+			return err
+		}
+
+		listener = socket
 	}
 
-	return err
+	return s.Listener(listener)
 }
 
 // Stop implements the interface of tiny.Service.
@@ -89,7 +110,6 @@ func (s *Server) OnError(handler func(c *fiber.Ctx, err error) error) {
 func (s *Server) createApp() *fiber.App {
 	appConfig := fiber.Config{
 		ErrorHandler:          s.errorFunction,
-		Network:               s.config.Network,
 		ReadTimeout:           s.config.ReadTimeout,
 		WriteTimeout:          s.config.WriteTimeout,
 		IdleTimeout:           s.config.IdleTimeout,
