@@ -2,7 +2,6 @@ package httpauth
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"net/http"
 )
 
 // VerificationResult is a structure returned by the user-provided token/cookie verification functions.
@@ -102,7 +101,7 @@ func (m *Middleware) authorize(
 				return config.errorHandler(c, err)
 			}
 
-			c.Status(http.StatusInternalServerError)
+			c.Status(fiber.StatusInternalServerError)
 			return nil
 		}
 
@@ -111,7 +110,7 @@ func (m *Middleware) authorize(
 				return config.unverifiedHandler(c)
 			}
 
-			c.Status(http.StatusUnauthorized)
+			c.Status(fiber.StatusUnauthorized)
 			return nil
 		}
 
@@ -121,7 +120,7 @@ func (m *Middleware) authorize(
 				return config.accessDeniedHandler(c)
 			}
 
-			c.Status(http.StatusForbidden)
+			c.Status(fiber.StatusForbidden)
 			return nil
 		}
 

@@ -7,7 +7,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/rs/zerolog/log"
-	"net/http"
 	"time"
 )
 
@@ -123,7 +122,7 @@ func (s *Server) errorFunction(c *fiber.Ctx, err error) error {
 		return s.errorHandler(c, err)
 	}
 
-	code := http.StatusInternalServerError
+	code := fiber.StatusInternalServerError
 
 	var fiberErr *fiber.Error
 	if errors.As(err, &fiberErr) {

@@ -21,7 +21,6 @@ import (
 	"github.com/mkorman9/tiny"
 	"github.com/mkorman9/tiny/tinyhttp"
 	"github.com/mkorman9/tiny/tinytcp"
-	"net/http"
 )
 
 func main() {
@@ -31,7 +30,7 @@ func main() {
 		config.String("http.address", "0.0.0.0:8080"),
 	)
 	httpServer.Get("/", func(c *fiber.Ctx) error {
-		return c.Status(http.StatusOK).
+		return c.Status(fiber.StatusOK).
 			JSON(fiber.Map{
 			    "message": "Hello world!",
 			})

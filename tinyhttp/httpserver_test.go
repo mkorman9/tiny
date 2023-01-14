@@ -20,7 +20,7 @@ func TestHTTPServer(t *testing.T) {
 
 	app := NewServer("address").App
 	app.Get("/test", func(c *fiber.Ctx) error {
-		return c.Status(http.StatusOK).
+		return c.Status(fiber.StatusOK).
 			SendString(payload)
 	})
 
@@ -40,8 +40,8 @@ func TestHTTPServer(t *testing.T) {
 		assert.Error(t, err)
 		return
 	}
-	
+
 	// then
-	assert.Equal(t, http.StatusOK, response.StatusCode, "response code should be 200")
+	assert.Equal(t, fiber.StatusOK, response.StatusCode, "response code should be 200")
 	assert.Equal(t, []byte(payload), responseBody, "response payload should match")
 }

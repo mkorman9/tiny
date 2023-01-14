@@ -23,13 +23,13 @@ type ServerConfig struct {
 	// TLSKey is a path to TLS key to use. When specified with TLSCert - enables TLS mode.
 	TLSKey string
 
-	// ReadTimeout is a timeout used when creating underlying http server (see http.Server) (default: 5s).
+	// ReadTimeout is a timeout used when creating underlying http server (default: 5s).
 	ReadTimeout time.Duration
 
-	// WriteTimeout is a timeout used when creating underlying http server (see http.Server) (default: 10s).
+	// WriteTimeout is a timeout used when creating underlying http server (default: 10s).
 	WriteTimeout time.Duration
 
-	// IdleTimeout is a timeout used when creating underlying http server (see http.Server) (default 2m).
+	// IdleTimeout is a timeout used when creating underlying http server (default 2m).
 	IdleTimeout time.Duration
 
 	// TrustedProxies is a list of CIDR address ranges that can be trusted when handling RemoteIP header.
@@ -73,21 +73,21 @@ func TLS(cert, key string) ServerOpt {
 	}
 }
 
-// ReadTimeout is a timeout used when creating underlying http server (see http.Server).
+// ReadTimeout is a timeout used when creating underlying http server.
 func ReadTimeout(timeout time.Duration) ServerOpt {
 	return func(config *ServerConfig) {
 		config.ReadTimeout = timeout
 	}
 }
 
-// WriteTimeout is a timeout used when creating underlying http server (see http.Server).
+// WriteTimeout is a timeout used when creating underlying http server.
 func WriteTimeout(timeout time.Duration) ServerOpt {
 	return func(config *ServerConfig) {
 		config.WriteTimeout = timeout
 	}
 }
 
-// IdleTimeout is a timeout used when creating underlying http server (see http.Server).
+// IdleTimeout is a timeout used when creating underlying http server.
 func IdleTimeout(timeout time.Duration) ServerOpt {
 	return func(config *ServerConfig) {
 		config.IdleTimeout = timeout

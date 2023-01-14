@@ -26,7 +26,7 @@ func TestMissingToken(t *testing.T) {
 		"/secured",
 		middleware.AnyOfRoles("ADMIN"),
 		func(c *fiber.Ctx) error {
-			return c.Status(http.StatusOK).
+			return c.Status(fiber.StatusOK).
 				SendString(payload)
 		},
 	)
@@ -41,7 +41,7 @@ func TestMissingToken(t *testing.T) {
 	}
 
 	// then
-	assert.Equal(t, http.StatusUnauthorized, response.StatusCode, "response code should be 401")
+	assert.Equal(t, fiber.StatusUnauthorized, response.StatusCode, "response code should be 401")
 }
 
 func TestInvalidToken(t *testing.T) {
@@ -56,7 +56,7 @@ func TestInvalidToken(t *testing.T) {
 		"/secured",
 		middleware.AnyOfRoles("ADMIN"),
 		func(c *fiber.Ctx) error {
-			return c.Status(http.StatusOK).
+			return c.Status(fiber.StatusOK).
 				SendString(payload)
 		},
 	)
@@ -72,7 +72,7 @@ func TestInvalidToken(t *testing.T) {
 	}
 
 	// then
-	assert.Equal(t, http.StatusUnauthorized, response.StatusCode, "response code should be 401")
+	assert.Equal(t, fiber.StatusUnauthorized, response.StatusCode, "response code should be 401")
 }
 
 func TestValidToken(t *testing.T) {
@@ -87,7 +87,7 @@ func TestValidToken(t *testing.T) {
 		"/secured",
 		middleware.AnyOfRoles("ADMIN"),
 		func(c *fiber.Ctx) error {
-			return c.Status(http.StatusOK).
+			return c.Status(fiber.StatusOK).
 				SendString(payload)
 		},
 	)
@@ -111,7 +111,7 @@ func TestValidToken(t *testing.T) {
 	}
 
 	// then
-	assert.Equal(t, http.StatusOK, response.StatusCode, "response code should be 200")
+	assert.Equal(t, fiber.StatusOK, response.StatusCode, "response code should be 200")
 	assert.Equal(t, []byte(payload), responseBody, "response payload should match")
 }
 
@@ -127,7 +127,7 @@ func TestInvalidRoles(t *testing.T) {
 		"/secured",
 		middleware.AnyOfRoles("SUPERUSER"),
 		func(c *fiber.Ctx) error {
-			return c.Status(http.StatusOK).
+			return c.Status(fiber.StatusOK).
 				SendString(payload)
 		},
 	)
@@ -143,7 +143,7 @@ func TestInvalidRoles(t *testing.T) {
 	}
 
 	// then
-	assert.Equal(t, http.StatusForbidden, response.StatusCode, "response code should be 403")
+	assert.Equal(t, fiber.StatusForbidden, response.StatusCode, "response code should be 403")
 }
 
 func createBearerTokenMiddleware(correctToken string) *Middleware {
