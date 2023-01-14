@@ -13,7 +13,6 @@ require (
 	github.com/mattn/go-isatty v0.0.17
 	github.com/rs/zerolog v1.28.0
 	github.com/stretchr/testify v1.8.1
-	github.com/valyala/fasthttp v1.43.0
 	google.golang.org/grpc v1.50.1
 	gorm.io/driver/postgres v1.4.5
 	gorm.io/gorm v1.24.1
@@ -53,6 +52,7 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
+	github.com/valyala/fasthttp v1.43.0 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	golang.org/x/crypto v0.0.0-20220829220503-c86fa9a7ed90 // indirect
 	golang.org/x/net v0.0.0-20220906165146-f3363e06e74c // indirect

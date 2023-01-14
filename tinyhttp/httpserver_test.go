@@ -4,7 +4,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/mkorman9/tiny"
 	"github.com/stretchr/testify/assert"
-	"github.com/valyala/fasthttp/fasthttputil"
 	"io"
 	"net/http"
 	"testing"
@@ -25,7 +24,6 @@ func TestHTTPServer(t *testing.T) {
 	})
 
 	// when
-	fasthttputil.NewInmemoryListener()
 	req, _ := http.NewRequest("GET", "/test", nil)
 	response, err := app.Test(req, -1)
 	if err != nil {
