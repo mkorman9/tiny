@@ -40,10 +40,11 @@ func NewServer(address string, opts ...ServerOpt) *Server {
 			"fc00::/7",
 			"::1/128",
 		},
-		RemoteIPHeader: "X-Forwarded-For",
-		Concurrency:    256 * 1024,
-		BodyLimit:      4 * 1024 * 1024,
-		ReadBufferSize: 4096,
+		RemoteIPHeader:  "X-Forwarded-For",
+		Concurrency:     256 * 1024,
+		BodyLimit:       4 * 1024 * 1024,
+		ReadBufferSize:  4096,
+		WriteBufferSize: 4096,
 	}
 
 	for _, opt := range opts {
@@ -118,6 +119,7 @@ func (s *Server) createApp() *fiber.App {
 		IdleTimeout:           s.config.IdleTimeout,
 		DisableStartupMessage: true,
 		EnablePrintRoutes:     false,
+		EnableIPValidation:    false,
 		JSONEncoder:           json.Marshal,
 		JSONDecoder:           json.Unmarshal,
 		Views:                 s.config.ViewEngine,
@@ -125,6 +127,7 @@ func (s *Server) createApp() *fiber.App {
 		Concurrency:           s.config.Concurrency,
 		BodyLimit:             s.config.BodyLimit,
 		ReadBufferSize:        s.config.ReadBufferSize,
+		WriteBufferSize:       s.config.WriteBufferSize,
 	}
 
 	if len(s.config.TrustedProxies) > 0 {

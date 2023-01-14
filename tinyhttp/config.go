@@ -60,6 +60,9 @@ type ServerConfig struct {
 	// ReadBufferSize specifies a per-connection buffer size (default: 4096).
 	ReadBufferSize int
 
+	// WriteBufferSize specifies a per-connection buffer size for responses (default: 4096).
+	WriteBufferSize int
+
 	fiberOption func(*fiber.Config)
 }
 
@@ -173,5 +176,12 @@ func BodyLimit(bodyLimit int) ServerOpt {
 func ReadBufferSize(readBufferSize int) ServerOpt {
 	return func(config *ServerConfig) {
 		config.ReadBufferSize = readBufferSize
+	}
+}
+
+// WriteBufferSize specifies a per-connection buffer size for responses.
+func WriteBufferSize(writeBufferSize int) ServerOpt {
+	return func(config *ServerConfig) {
+		config.WriteBufferSize = writeBufferSize
 	}
 }
