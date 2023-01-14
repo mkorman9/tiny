@@ -3,6 +3,7 @@ package tinyhttp
 import (
 	"errors"
 	"fmt"
+	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/rs/zerolog/log"
@@ -92,6 +93,8 @@ func (s *Server) createApp() *fiber.App {
 		IdleTimeout:           s.config.IdleTimeout,
 		DisableStartupMessage: true,
 		EnablePrintRoutes:     false,
+		JSONEncoder:           json.Marshal,
+		JSONDecoder:           json.Unmarshal,
 	}
 
 	if len(s.config.TrustedProxies) > 0 {
