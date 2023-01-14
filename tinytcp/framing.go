@@ -35,6 +35,7 @@ type lengthPrefixedFramingProtocol struct {
 type PacketFramingConfig struct {
 	readBufferSize int
 	maxPacketSize  int
+	minReadSpace   int
 }
 
 // PacketFramingOpt represents an option to be specified to PacketFramingHandler.
@@ -54,6 +55,14 @@ func MaxPacketSize(size int) PacketFramingOpt {
 	}
 }
 
+// MinReadSpace sets a minimal space in read buffer that's needed to fit another Read() into it,
+// without allocating auxiliary buffer (default: 1KiB or 1/4 of ReadBufferSize).
+func MinReadSpace(space int) PacketFramingOpt {
+	return func(config *PacketFramingConfig) {
+		config.minReadSpace = space
+	}
+}
+
 // PacketFramingHandler returns a ConnectedSocketHandler that handles packet framing according to given FramingProtocol.
 func PacketFramingHandler(
 	framingProtocol FramingProtocol,
@@ -63,9 +72,14 @@ func PacketFramingHandler(
 	config := &PacketFramingConfig{
 		readBufferSize: 4 * 1024,  // 4 KiB
 		maxPacketSize:  16 * 1024, // 16 KiB
+		minReadSpace:   1024,      // 1 KiB
 	}
 	for _, opt := range opts {
 		opt(config)
+	}
+
+	if config.minReadSpace > config.readBufferSize {
+		config.minReadSpace = config.readBufferSize / 4
 	}
 
 	// common buffers are pooled to avoid memory allocation in hot path
@@ -99,6 +113,12 @@ func PacketFramingHandler(
 
 			// receiveBuffer is used to hold data between consecutive Read() calls in case a packet is fragmented.
 			receiveBuffer *bytes.Buffer
+
+			// leftOffset indicates a place in read buffer after the last, already handled packet.
+			leftOffset int
+
+			// rightOffset indicates a place in read buffer in which the next Read() will occur.
+			rightOffset int
 		)
 
 		defer func() {
@@ -115,7 +135,7 @@ func PacketFramingHandler(
 		}()
 
 		for {
-			bytesRead, err := socket.Read(readBuffer)
+			bytesRead, err := socket.Read(readBuffer[rightOffset:])
 			if err != nil {
 				if socket.IsClosed() {
 					break
@@ -137,31 +157,53 @@ func PacketFramingHandler(
 						receiveBuffer.Reset()
 					}
 
+					leftOffset = 0
+					rightOffset = 0
 					continue
 				}
 			}
 
 			// include data from past iteration if receive buffer is not empty
-			buffer := readBuffer[:bytesRead]
+			buffer := readBuffer[leftOffset : rightOffset+bytesRead]
 			if receiveBuffer != nil && receiveBuffer.Len() > 0 {
 				receiveBuffer.Write(buffer)
 				buffer = receiveBuffer.Bytes()
 				receiveBuffer.Reset()
 			}
 
+			extractedAnything := false
 			for {
 				packet, rest, extracted := framingProtocol.ExtractPacket(buffer)
 				if extracted {
 					// fast path - packet is extracted straight from the readBuffer, without memory allocations
 					buffer = rest
+					leftOffset += len(packet)
+					rightOffset += len(packet)
+					extractedAnything = true
 					ctx.handlePacket(packet)
 				} else {
-					// slow path - packet is fragmented, memory allocation needed
-					if receiveBuffer == nil {
-						receiveBuffer = receiveBufferPool.Get().(*bytes.Buffer)
+					if extractedAnything && len(buffer) == 0 {
+						leftOffset = 0
+						rightOffset = 0
+						break
 					}
 
-					receiveBuffer.Write(buffer)
+					// packet is fragmented
+
+					if rightOffset+bytesRead > len(readBuffer)-config.minReadSpace {
+						// slow path - memory allocation needed
+						if receiveBuffer == nil {
+							receiveBuffer = receiveBufferPool.Get().(*bytes.Buffer)
+						}
+
+						receiveBuffer.Write(buffer)
+						leftOffset = 0
+						rightOffset = 0
+					} else {
+						// we'll still fit another Read() into read buffer
+						rightOffset += len(buffer)
+					}
+
 					break
 				}
 			}
