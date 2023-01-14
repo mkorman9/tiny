@@ -1,6 +1,7 @@
 package tinyhttp
 
 import (
+	"github.com/gofiber/fiber/v2"
 	"time"
 )
 
@@ -39,6 +40,23 @@ type ServerConfig struct {
 	// RemoteIPHeaders is a list of headers that overwrite the value of client's remote address.
 	// (default: "X-Forwarded-For")
 	RemoteIPHeader string
+
+	// ViewEngine is a template rendering engine for fiber (default: nil).
+	ViewEngine fiber.Views
+
+	// ViewLayout is a global layout for ViewEngine (default: "").
+	ViewLayout string
+
+	// Concurrency specifies a maximum number of concurrent connections (default: 256 * 1024).
+	Concurrency int
+
+	// BodyLimit specifies a maximum allowed size for a request body (default: 4 * 1024 * 1024).
+	BodyLimit int
+
+	// ReadBufferSize specifies a per-connection buffer size (default: 4096).
+	ReadBufferSize int
+
+	fiberOption func(*fiber.Config)
 }
 
 // ServerOpt is an option to be specified to NewServer.
@@ -105,5 +123,47 @@ func TrustedProxies(trustedProxies []string) ServerOpt {
 func RemoteIPHeader(header string) ServerOpt {
 	return func(config *ServerConfig) {
 		config.RemoteIPHeader = header
+	}
+}
+
+// FiberOption specifies user-defined function that directly modifies fiber config.
+func FiberOption(opt func(*fiber.Config)) ServerOpt {
+	return func(config *ServerConfig) {
+		config.fiberOption = opt
+	}
+}
+
+// ViewEngine is a template rendering engine for fiber.
+func ViewEngine(engine fiber.Views) ServerOpt {
+	return func(config *ServerConfig) {
+		config.ViewEngine = engine
+	}
+}
+
+// ViewLayout is a global layout for ViewEngine.
+func ViewLayout(layout string) ServerOpt {
+	return func(config *ServerConfig) {
+		config.ViewLayout = layout
+	}
+}
+
+// Concurrency specifies a maximum number of concurrent connections.
+func Concurrency(concurrency int) ServerOpt {
+	return func(config *ServerConfig) {
+		config.Concurrency = concurrency
+	}
+}
+
+// BodyLimit specifies a maximum allowed size for a request body.
+func BodyLimit(bodyLimit int) ServerOpt {
+	return func(config *ServerConfig) {
+		config.BodyLimit = bodyLimit
+	}
+}
+
+// ReadBufferSize specifies a per-connection buffer size.
+func ReadBufferSize(readBufferSize int) ServerOpt {
+	return func(config *ServerConfig) {
+		config.ReadBufferSize = readBufferSize
 	}
 }
