@@ -68,7 +68,10 @@ func (s *Server) Start() error {
 			return err
 		}
 
+		tlsHandler := &fiber.TLSHandler{}
 		s.config.TLSConfig.Certificates = []tls.Certificate{cert}
+		s.config.TLSConfig.GetCertificate = tlsHandler.GetClientInfo
+		s.SetTLSHandler(tlsHandler)
 
 		socket, err := tls.Listen(s.config.Network, s.config.address, s.config.TLSConfig)
 		if err != nil {
