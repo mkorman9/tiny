@@ -18,9 +18,9 @@ type PacketFramingContext struct {
 
 // FramingProtocol defines a strategy of extracting meaningful chunks of data out of read buffer.
 type FramingProtocol interface {
-	// ExtractPacket splits the buffer into packet and "the rest".
+	// ExtractPacket splits the source buffer into packet and "the rest".
 	// Returns extracted == true if the meaningful packet has been extracted.
-	ExtractPacket(accumulator []byte) (packet []byte, rest []byte, extracted bool)
+	ExtractPacket(source []byte) (packet []byte, rest []byte, extracted bool)
 }
 
 type separatorFramingProtocol struct {
