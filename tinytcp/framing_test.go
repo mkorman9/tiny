@@ -118,6 +118,36 @@ func TestFramingHandlerTwoFragmentedPackets(t *testing.T) {
 	assert.Equal(t, 2, receivedPackets, "received packets count must match")
 }
 
+func TestFramingHandlerDelayedWriter(t *testing.T) {
+	// given
+	in := newDelayedReader(
+		bytes.NewBuffer(bytes.Join(
+			[][]byte{generateTestPayloadWithSeparator(128), generateTestPayloadWithSeparator(128)},
+			nil,
+		)),
+		160, 200,
+	)
+	socket := MockConnectedSocket(in, io.Discard)
+
+	// when
+	var receivedPackets int
+
+	PacketFramingHandler(
+		SplitBySeparator([]byte{'\n'}),
+		func(ctx *PacketFramingContext) {
+			// then
+			assert.Equal(t, socket, ctx.Socket(), "context must hold the original socket")
+
+			ctx.OnPacket(func(packet []byte) {
+				receivedPackets++
+				assert.True(t, validateTestPayload(128, packet), "packet should be valid")
+			})
+		},
+	)(socket)
+
+	assert.Equal(t, 2, receivedPackets, "received packets count must match")
+}
+
 func TestFramingHandlerPacketTooBig(t *testing.T) {
 	// given
 	in := bytes.NewBuffer(generateTestPayloadWithSeparator(1024))
@@ -280,4 +310,36 @@ func validateTestPayload(n int, payload []byte) bool {
 	}
 
 	return true
+}
+
+type delayedReader struct {
+	reader   io.Reader
+	schedule []int
+	index    int
+}
+
+func newDelayedReader(reader io.Reader, schedule ...int) *delayedReader {
+	return &delayedReader{
+		reader:   reader,
+		schedule: append(schedule, 0),
+		index:    0,
+	}
+}
+
+func (dr *delayedReader) Read(b []byte) (int, error) {
+	chunkSize := dr.schedule[dr.index]
+	if chunkSize == 0 {
+		return 0, io.EOF
+	}
+
+	readBuffer := make([]byte, chunkSize)
+	dr.index += 1
+
+	n, err := dr.reader.Read(readBuffer)
+	if err != nil {
+		return n, err
+	}
+
+	copy(b, readBuffer[:n])
+	return n, err
 }

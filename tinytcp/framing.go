@@ -175,9 +175,11 @@ func PacketFramingHandler(
 				packet, rest, extracted := framingProtocol.ExtractPacket(source)
 				if extracted {
 					// fast path - packet is extracted straight from the readBuffer, without memory allocations
+					excessBytes := len(source) - len(packet) - len(rest)
+					leftOffset += len(packet) + excessBytes
+					rightOffset += len(packet) + excessBytes
 					source = rest
-					leftOffset += len(packet)
-					rightOffset += len(packet)
+
 					ctx.handlePacket(packet)
 				} else {
 					if len(source) == 0 {
