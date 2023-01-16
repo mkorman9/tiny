@@ -9,13 +9,6 @@ import (
 // PacketHandler is a function to be called after receiving packet data.
 type PacketHandler func(packet []byte)
 
-// PacketFramingContext represents an interface that lets user subscribe on packets incoming from ConnectedSocket.
-// Packet framing is specified by FramingProtocol passed to PacketFramingHandler.
-type PacketFramingContext struct {
-	socket  *ConnectedSocket
-	handler PacketHandler
-}
-
 // FramingProtocol defines a strategy of extracting meaningful chunks of data out of read buffer.
 type FramingProtocol interface {
 	// ExtractPacket splits the source buffer into packet and "the rest".
@@ -66,7 +59,7 @@ func MinReadSpace(space int) PacketFramingOpt {
 // PacketFramingHandler returns a ConnectedSocketHandler that handles packet framing according to given FramingProtocol.
 func PacketFramingHandler(
 	framingProtocol FramingProtocol,
-	handler func(ctx *PacketFramingContext),
+	socketHandler func(socket *ConnectedSocket) PacketHandler,
 	opts ...PacketFramingOpt,
 ) ConnectedSocketHandler {
 	config := &PacketFramingConfig{
@@ -94,18 +87,10 @@ func PacketFramingHandler(
 				return &bytes.Buffer{}
 			},
 		}
-		packetFramingContextPool = sync.Pool{
-			New: func() any {
-				return &PacketFramingContext{}
-			},
-		}
 	)
 
 	return func(socket *ConnectedSocket) {
-		ctx := packetFramingContextPool.Get().(*PacketFramingContext)
-		ctx.socket = socket
-
-		handler(ctx)
+		packetHandler := socketHandler(socket)
 
 		var (
 			// readBuffer is a fixed-size page, which is never reallocated. Socket pumps data straight into it.
@@ -123,10 +108,6 @@ func PacketFramingHandler(
 
 		defer func() {
 			readBufferPool.Put(readBuffer)
-
-			ctx.socket = nil
-			ctx.handler = nil
-			packetFramingContextPool.Put(ctx)
 
 			if receiveBuffer != nil {
 				receiveBuffer.Reset()
@@ -180,7 +161,7 @@ func PacketFramingHandler(
 					rightOffset += len(packet) + excessBytes
 					source = rest
 
-					ctx.handlePacket(packet)
+					packetHandler(packet)
 				} else {
 					if len(source) == 0 {
 						leftOffset = 0
@@ -208,22 +189,6 @@ func PacketFramingHandler(
 				}
 			}
 		}
-	}
-}
-
-// Socket returns underlying ConnectedSocket.
-func (p *PacketFramingContext) Socket() *ConnectedSocket {
-	return p.socket
-}
-
-// OnPacket registers a handler that is run each time a packet is extracted from the read buffer.
-func (p *PacketFramingContext) OnPacket(handler PacketHandler) {
-	p.handler = handler
-}
-
-func (p *PacketFramingContext) handlePacket(packet []byte) {
-	if p.handler != nil {
-		p.handler(packet)
 	}
 }
 

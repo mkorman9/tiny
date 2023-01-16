@@ -22,14 +22,14 @@ func TestFramingHandlerSimple(t *testing.T) {
 
 	PacketFramingHandler(
 		SplitBySeparator([]byte{'\n'}),
-		func(ctx *PacketFramingContext) {
+		func(providedSocket *ConnectedSocket) PacketHandler {
 			// then
-			assert.Equal(t, socket, ctx.Socket(), "context must hold the original socket")
+			assert.Equal(t, socket, providedSocket, "sockets must match")
 
-			ctx.OnPacket(func(packet []byte) {
+			return func(packet []byte) {
 				receivedPackets++
 				assert.True(t, validateTestPayload(128, packet), "packet should be valid")
-			})
+			}
 		},
 	)(socket)
 
@@ -49,14 +49,14 @@ func TestFramingHandlerTwoPackets(t *testing.T) {
 
 	PacketFramingHandler(
 		SplitBySeparator([]byte{'\n'}),
-		func(ctx *PacketFramingContext) {
+		func(providedSocket *ConnectedSocket) PacketHandler {
 			// then
-			assert.Equal(t, socket, ctx.Socket(), "context must hold the original socket")
+			assert.Equal(t, socket, providedSocket, "sockets must match")
 
-			ctx.OnPacket(func(packet []byte) {
+			return func(packet []byte) {
 				receivedPackets++
 				assert.True(t, validateTestPayload(128, packet), "packet should be valid")
-			})
+			}
 		},
 	)(socket)
 
@@ -73,14 +73,14 @@ func TestFramingHandlerFragmentedPacket(t *testing.T) {
 
 	PacketFramingHandler(
 		SplitBySeparator([]byte{'\n'}),
-		func(ctx *PacketFramingContext) {
+		func(providedSocket *ConnectedSocket) PacketHandler {
 			// then
-			assert.Equal(t, socket, ctx.Socket(), "context must hold the original socket")
+			assert.Equal(t, socket, providedSocket, "sockets must match")
 
-			ctx.OnPacket(func(packet []byte) {
+			return func(packet []byte) {
 				receivedPackets++
 				assert.True(t, validateTestPayload(1024, packet), "packet should be valid")
-			})
+			}
 		},
 		ReadBufferSize(512),
 		MinReadSpace(256),
@@ -102,14 +102,14 @@ func TestFramingHandlerTwoFragmentedPackets(t *testing.T) {
 
 	PacketFramingHandler(
 		SplitBySeparator([]byte{'\n'}),
-		func(ctx *PacketFramingContext) {
+		func(providedSocket *ConnectedSocket) PacketHandler {
 			// then
-			assert.Equal(t, socket, ctx.Socket(), "context must hold the original socket")
+			assert.Equal(t, socket, providedSocket, "sockets must match")
 
-			ctx.OnPacket(func(packet []byte) {
+			return func(packet []byte) {
 				receivedPackets++
 				assert.True(t, validateTestPayload(512, packet), "packet should be valid")
-			})
+			}
 		},
 		ReadBufferSize(768),
 		MinReadSpace(100),
@@ -134,14 +134,14 @@ func TestFramingHandlerDelayedWriter(t *testing.T) {
 
 	PacketFramingHandler(
 		SplitBySeparator([]byte{'\n'}),
-		func(ctx *PacketFramingContext) {
+		func(providedSocket *ConnectedSocket) PacketHandler {
 			// then
-			assert.Equal(t, socket, ctx.Socket(), "context must hold the original socket")
+			assert.Equal(t, socket, providedSocket, "sockets must match")
 
-			ctx.OnPacket(func(packet []byte) {
+			return func(packet []byte) {
 				receivedPackets++
 				assert.True(t, validateTestPayload(128, packet), "packet should be valid")
-			})
+			}
 		},
 	)(socket)
 
@@ -158,13 +158,13 @@ func TestFramingHandlerPacketTooBig(t *testing.T) {
 
 	PacketFramingHandler(
 		SplitBySeparator([]byte{'\n'}),
-		func(ctx *PacketFramingContext) {
+		func(providedSocket *ConnectedSocket) PacketHandler {
 			// then
-			assert.Equal(t, socket, ctx.Socket(), "context must hold the original socket")
+			assert.Equal(t, socket, providedSocket, "sockets must match")
 
-			ctx.OnPacket(func(packet []byte) {
+			return func(packet []byte) {
 				receivedPackets++
-			})
+			}
 		},
 		MaxPacketSize(512),
 	)(socket)
