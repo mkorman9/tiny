@@ -177,14 +177,10 @@ func (s *Server) Sockets() []*ConnectedSocket {
 	defer s.socketsMutex.RUnlock()
 
 	var list []*ConnectedSocket
-	var node = s.socketsListHead
-
-	for node != nil {
+	for node := s.socketsListHead; node != nil; node = node.next {
 		if !node.socket.IsClosed() {
 			list = append(list, node.socket)
 		}
-
-		node = node.next
 	}
 
 	return list
@@ -289,8 +285,7 @@ func (s *Server) updateMetrics() {
 	}
 	s.forkingStrategy.OnMetricsUpdate(&s.metrics)
 
-	var node = s.socketsListHead
-	for node != nil {
+	for node := s.socketsListHead; node != nil; node = node.next {
 		reads := node.socket.ReadsPerSecond()
 		writes := node.socket.WritesPerSecond()
 
@@ -298,19 +293,14 @@ func (s *Server) updateMetrics() {
 		s.metrics.TotalWritten += writes
 		s.metrics.ReadsPerSecond += reads
 		s.metrics.WritesPerSecond += writes
-
-		node = node.next
 	}
 
 	if s.metricsUpdateHandler != nil {
 		s.metricsUpdateHandler()
 	}
 
-	node = s.socketsListHead
-	for node != nil {
-		socket := node.socket
-		socket.resetMetrics()
-		node = node.next
+	for node := s.socketsListHead; node != nil; node = node.next {
+		node.socket.resetMetrics()
 	}
 }
 
@@ -319,7 +309,6 @@ func (s *Server) cleanupConnectedSockets() {
 	defer s.socketsMutex.Unlock()
 
 	var node = s.socketsListHead
-
 	for node != nil {
 		socket := node.socket
 		next := node.next
