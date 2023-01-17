@@ -47,9 +47,7 @@ func NewServer(address string, opts ...ServerOpt) *Server {
 	}
 
 	return &Server{
-		config:          config,
-		socketsListHead: nil,
-		socketsCount:    0,
+		config: config,
 		connectedSocketPool: sync.Pool{
 			New: func() any {
 				return &ConnectedSocket{}
@@ -76,6 +74,11 @@ func NewServer(address string, opts ...ServerOpt) *Server {
 // ForkingStrategy sets forking strategy used by this server (see ForkingStrategy).
 func (s *Server) ForkingStrategy(forkingStrategy ForkingStrategy) {
 	s.forkingStrategy = forkingStrategy
+}
+
+// Port returns a port number used by underlying listener. Only returns a valid value after Start().
+func (s *Server) Port() int {
+	return resolveListenerPort(s.listener)
 }
 
 // Start implements the interface of tiny.Service.

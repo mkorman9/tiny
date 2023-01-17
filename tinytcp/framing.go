@@ -127,12 +127,12 @@ func PacketFramingHandler(
 
 			// validate packet size
 			if config.maxPacketSize > 0 {
-				memoryNeeded := rightOffset + bytesRead - leftOffset
+				memoryUsed := rightOffset + bytesRead - leftOffset
 				if receiveBuffer != nil {
-					memoryNeeded += receiveBuffer.Len()
+					memoryUsed += receiveBuffer.Len()
 				}
 
-				if memoryNeeded > config.maxPacketSize {
+				if memoryUsed > config.maxPacketSize {
 					// packet too big
 					if receiveBuffer != nil {
 						receiveBuffer.Reset()

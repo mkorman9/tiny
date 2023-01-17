@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"syscall"
 )
@@ -60,4 +61,19 @@ func parseRemoteAddress(connection net.Conn) string {
 	}
 
 	return host
+}
+
+func resolveListenerPort(listener net.Listener) int {
+	address := listener.Addr().String()
+	_, portRaw, err := net.SplitHostPort(address)
+	if err != nil {
+		return 0
+	}
+
+	port, err := strconv.Atoi(portRaw)
+	if err != nil {
+		return 0
+	}
+
+	return port
 }
