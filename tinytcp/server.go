@@ -291,10 +291,8 @@ func (s *Server) updateMetrics() {
 
 	var node = s.socketsListHead
 	for node != nil {
-		socket := node.socket
-
-		reads := socket.ReadsPerSecond()
-		writes := socket.WritesPerSecond()
+		reads := node.socket.ReadsPerSecond()
+		writes := node.socket.WritesPerSecond()
 
 		s.metrics.TotalRead += reads
 		s.metrics.TotalWritten += writes
@@ -324,26 +322,26 @@ func (s *Server) cleanupConnectedSockets() {
 
 	for node != nil {
 		socket := node.socket
+		next := node.next
 
 		if socket.IsClosed() {
 			if node == s.socketsListHead {
-				s.socketsListHead = node
+				s.socketsListHead = node.next
 			} else {
 				node.prev.next = node.next
 				node.next.prev = node.prev
 			}
 
-			next := node.next
 			node.socket = nil
 			node.next = nil
 			node.prev = nil
 			s.socketNodesPool.Put(node)
-			node = next
 
 			s.recycleConnectedSocket(socket)
-		} else {
-			node = node.next
+			s.socketsCount--
 		}
+
+		node = next
 	}
 }
 
