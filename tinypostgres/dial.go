@@ -10,33 +10,27 @@ import (
 )
 
 // Dial creates a connection to Postgres, and returns *gorm.DB instance.
-func Dial(url string, opts ...Opt) (*gorm.DB, error) {
-	config := Config{
-		Verbose:         false,
-		PoolMaxOpen:     10,
-		PoolMaxIdle:     5,
-		PoolMaxLifetime: time.Hour,
-		PoolMaxIdleTime: 30 * time.Minute,
+func Dial(url string, config ...*Config) (*gorm.DB, error) {
+	var providedConfig *Config
+	if config != nil {
+		providedConfig = config[0]
 	}
-
-	for _, opt := range opts {
-		opt(&config)
-	}
+	c := mergeConfig(providedConfig)
 
 	if url == "" {
 		return nil, errors.New("URL cannot be empty")
 	}
 
 	gormConfig := &gorm.Config{
-		Logger: &gormcommon.GormLogger{Verbose: config.Verbose},
+		Logger: &gormcommon.GormLogger{Verbose: c.Verbose},
 		NowFunc: func() time.Time {
 			return time.Now().UTC()
 		},
 		QueryFields: true,
 	}
 
-	for _, opt := range config.gormOpts {
-		opt(gormConfig)
+	if c.GormOpt != nil {
+		c.GormOpt(gormConfig)
 	}
 
 	db, err := gorm.Open(postgres.Open(url), gormConfig)
@@ -46,10 +40,10 @@ func Dial(url string, opts ...Opt) (*gorm.DB, error) {
 			return nil, err
 		}
 
-		sqlDB.SetMaxOpenConns(config.PoolMaxOpen)
-		sqlDB.SetMaxIdleConns(config.PoolMaxIdle)
-		sqlDB.SetConnMaxLifetime(config.PoolMaxLifetime)
-		sqlDB.SetConnMaxIdleTime(config.PoolMaxIdleTime)
+		sqlDB.SetMaxOpenConns(c.PoolMaxOpen)
+		sqlDB.SetMaxIdleConns(c.PoolMaxIdle)
+		sqlDB.SetConnMaxLifetime(c.PoolMaxLifetime)
+		sqlDB.SetConnMaxIdleTime(c.PoolMaxIdleTime)
 	}
 
 	return db, err

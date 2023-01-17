@@ -26,60 +26,62 @@ type lengthPrefixedFramingProtocol struct {
 
 // PacketFramingConfig hold configuration for PacketFramingHandler.
 type PacketFramingConfig struct {
-	readBufferSize int
-	maxPacketSize  int
-	minReadSpace   int
+	// ReadBufferSize sets a size of read buffer (default: 4KiB).
+	ReadBufferSize int
+
+	// MaxPacketSize sets a maximal size of a packet (default: 16KiB).
+	MaxPacketSize int
+
+	// MinReadSpace sets a minimal space in read buffer that's needed to fit another Read() into it,
+	// without allocating auxiliary buffer (default: 1KiB or 1/4 of ReadBufferSize).
+	MinReadSpace int
 }
 
-// PacketFramingOpt represents an option to be specified to PacketFramingHandler.
-type PacketFramingOpt = func(*PacketFramingConfig)
-
-// ReadBufferSize sets a size of read buffer (default: 4KiB).
-func ReadBufferSize(size int) PacketFramingOpt {
-	return func(config *PacketFramingConfig) {
-		config.readBufferSize = size
+func mergePacketFramingConfig(provided *PacketFramingConfig) *PacketFramingConfig {
+	config := &PacketFramingConfig{
+		ReadBufferSize: 4 * 1024,  // 4 KiB
+		MaxPacketSize:  16 * 1024, // 16 KiB
+		MinReadSpace:   1024,      // 1 KiB
 	}
-}
 
-// MaxPacketSize sets a maximal size of a packet (default: 16KiB).
-func MaxPacketSize(size int) PacketFramingOpt {
-	return func(config *PacketFramingConfig) {
-		config.maxPacketSize = size
+	if provided == nil {
+		return config
 	}
-}
 
-// MinReadSpace sets a minimal space in read buffer that's needed to fit another Read() into it,
-// without allocating auxiliary buffer (default: 1KiB or 1/4 of ReadBufferSize).
-func MinReadSpace(space int) PacketFramingOpt {
-	return func(config *PacketFramingConfig) {
-		config.minReadSpace = space
+	if provided.ReadBufferSize > 0 {
+		config.ReadBufferSize = provided.ReadBufferSize
 	}
+	if provided.MaxPacketSize > 0 {
+		config.MaxPacketSize = provided.MaxPacketSize
+	}
+	if provided.MinReadSpace > 0 {
+		config.MinReadSpace = provided.MinReadSpace
+	}
+
+	if config.MinReadSpace > config.ReadBufferSize {
+		config.MinReadSpace = config.ReadBufferSize / 4
+	}
+
+	return config
 }
 
 // PacketFramingHandler returns a ConnectedSocketHandler that handles packet framing according to given FramingProtocol.
 func PacketFramingHandler(
 	framingProtocol FramingProtocol,
 	socketHandler func(socket *ConnectedSocket) PacketHandler,
-	opts ...PacketFramingOpt,
+	config ...*PacketFramingConfig,
 ) ConnectedSocketHandler {
-	config := &PacketFramingConfig{
-		readBufferSize: 4 * 1024,  // 4 KiB
-		maxPacketSize:  16 * 1024, // 16 KiB
-		minReadSpace:   1024,      // 1 KiB
+	var providedConfig *PacketFramingConfig
+	if config != nil {
+		providedConfig = config[0]
 	}
-	for _, opt := range opts {
-		opt(config)
-	}
-
-	if config.minReadSpace > config.readBufferSize {
-		config.minReadSpace = config.readBufferSize / 4
-	}
+	c := mergePacketFramingConfig(providedConfig)
 
 	// common buffers are pooled to avoid memory allocation in hot path
 	var (
 		readBufferPool = sync.Pool{
 			New: func() any {
-				return make([]byte, config.readBufferSize)
+				return make([]byte, c.ReadBufferSize)
 			},
 		}
 		receiveBufferPool = sync.Pool{
@@ -126,13 +128,13 @@ func PacketFramingHandler(
 			}
 
 			// validate packet size
-			if config.maxPacketSize > 0 {
+			if c.MaxPacketSize > 0 {
 				memoryUsed := rightOffset + bytesRead - leftOffset
 				if receiveBuffer != nil {
 					memoryUsed += receiveBuffer.Len()
 				}
 
-				if memoryUsed > config.maxPacketSize {
+				if memoryUsed > c.MaxPacketSize {
 					// packet too big
 					if receiveBuffer != nil {
 						receiveBuffer.Reset()
@@ -171,7 +173,7 @@ func PacketFramingHandler(
 
 					// packet is fragmented
 
-					if rightOffset+len(source) > len(readBuffer)-config.minReadSpace {
+					if rightOffset+len(source) > len(readBuffer)-c.MinReadSpace {
 						// slow path - memory allocation needed
 						if receiveBuffer == nil {
 							receiveBuffer = receiveBufferPool.Get().(*bytes.Buffer)

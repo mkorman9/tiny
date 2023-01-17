@@ -8,8 +8,6 @@ import (
 
 // ServerConfig holds a configuration for NewServer.
 type ServerConfig struct {
-	address string
-
 	// Network is a network type for the listener (default: "tcp").
 	Network string
 
@@ -63,125 +61,92 @@ type ServerConfig struct {
 	// WriteBufferSize specifies a per-connection buffer size for responses (default: 4096).
 	WriteBufferSize int
 
-	fiberOption func(*fiber.Config)
+	// FiberOpt allows to specify custom function that will operate directly on *fiber.Config.
+	FiberOpt func(*fiber.Config)
 }
 
-// ServerOpt is an option to be specified to NewServer.
-type ServerOpt = func(*ServerConfig)
-
-// Network is a network type for the listener.
-func Network(network string) ServerOpt {
-	return func(config *ServerConfig) {
-		config.Network = network
+func mergeServerConfig(provided *ServerConfig) *ServerConfig {
+	config := &ServerConfig{
+		Network:         "tcp",
+		SecurityHeaders: true,
+		ShutdownTimeout: 5 * time.Second,
+		TLSConfig:       &tls.Config{},
+		ReadTimeout:     5 * time.Second,
+		WriteTimeout:    10 * time.Second,
+		IdleTimeout:     2 * time.Minute,
+		TrustedProxies: []string{
+			"10.0.0.0/8",
+			"172.16.0.0/12",
+			"192.168.0.0/16",
+			"127.0.0.0/8",
+			"fc00::/7",
+			"::1/128",
+		},
+		RemoteIPHeader:  "X-Forwarded-For",
+		Concurrency:     256 * 1024,
+		BodyLimit:       4 * 1024 * 1024,
+		ReadBufferSize:  4096,
+		WriteBufferSize: 4096,
 	}
-}
 
-// SecurityHeaders defines whether to include HTTP security headers to all responses or not.
-func SecurityHeaders(securityHeaders bool) ServerOpt {
-	return func(config *ServerConfig) {
-		config.SecurityHeaders = securityHeaders
+	if provided == nil {
+		return config
 	}
-}
 
-// ShutdownTimeout defines a maximal timeout of HTTP server shutdown.
-func ShutdownTimeout(timeout time.Duration) ServerOpt {
-	return func(config *ServerConfig) {
-		config.ShutdownTimeout = timeout
+	if provided.Network != "" {
+		config.Network = provided.Network
 	}
-}
-
-// TLS enables TLS mode if both cert and key point to valid TLS credentials.
-func TLS(cert, key string, tlsConfig ...*tls.Config) ServerOpt {
-	return func(config *ServerConfig) {
-		config.TLSCert = cert
-		config.TLSKey = key
-
-		if tlsConfig != nil {
-			config.TLSConfig = tlsConfig[0]
-		}
+	if provided.SecurityHeaders {
+		config.SecurityHeaders = true
 	}
-}
-
-// ReadTimeout is a timeout used when creating underlying http server.
-func ReadTimeout(timeout time.Duration) ServerOpt {
-	return func(config *ServerConfig) {
-		config.ReadTimeout = timeout
+	if provided.ShutdownTimeout > 0 {
+		config.ShutdownTimeout = provided.ShutdownTimeout
 	}
-}
-
-// WriteTimeout is a timeout used when creating underlying http server.
-func WriteTimeout(timeout time.Duration) ServerOpt {
-	return func(config *ServerConfig) {
-		config.WriteTimeout = timeout
+	if provided.TLSCert != "" {
+		config.TLSCert = provided.TLSCert
 	}
-}
-
-// IdleTimeout is a timeout used when creating underlying http server.
-func IdleTimeout(timeout time.Duration) ServerOpt {
-	return func(config *ServerConfig) {
-		config.IdleTimeout = timeout
+	if provided.TLSKey != "" {
+		config.TLSKey = provided.TLSKey
 	}
-}
-
-// TrustedProxies is a list of CIDR address ranges that can be trusted when handling RemoteIP header.
-func TrustedProxies(trustedProxies []string) ServerOpt {
-	return func(config *ServerConfig) {
-		config.TrustedProxies = trustedProxies
+	if provided.TLSConfig != nil {
+		config.TLSConfig = provided.TLSConfig
 	}
-}
-
-// RemoteIPHeader is a name of the header that overwrites the value of client's remote address.
-func RemoteIPHeader(header string) ServerOpt {
-	return func(config *ServerConfig) {
-		config.RemoteIPHeader = header
+	if provided.ReadTimeout > 0 {
+		config.ReadTimeout = provided.ReadTimeout
 	}
-}
-
-// FiberOption specifies user-defined function that directly modifies fiber config.
-func FiberOption(opt func(*fiber.Config)) ServerOpt {
-	return func(config *ServerConfig) {
-		config.fiberOption = opt
+	if provided.WriteTimeout > 0 {
+		config.WriteTimeout = provided.WriteTimeout
 	}
-}
-
-// ViewEngine is a template rendering engine for fiber.
-func ViewEngine(engine fiber.Views) ServerOpt {
-	return func(config *ServerConfig) {
-		config.ViewEngine = engine
+	if provided.IdleTimeout > 0 {
+		config.IdleTimeout = provided.IdleTimeout
 	}
-}
-
-// ViewLayout is a global layout for ViewEngine.
-func ViewLayout(layout string) ServerOpt {
-	return func(config *ServerConfig) {
-		config.ViewLayout = layout
+	if provided.TrustedProxies != nil {
+		config.TrustedProxies = provided.TrustedProxies
 	}
-}
-
-// Concurrency specifies a maximum number of concurrent connections.
-func Concurrency(concurrency int) ServerOpt {
-	return func(config *ServerConfig) {
-		config.Concurrency = concurrency
+	if provided.RemoteIPHeader != "" {
+		config.RemoteIPHeader = provided.RemoteIPHeader
 	}
-}
-
-// BodyLimit specifies a maximum allowed size for a request body.
-func BodyLimit(bodyLimit int) ServerOpt {
-	return func(config *ServerConfig) {
-		config.BodyLimit = bodyLimit
+	if provided.ViewEngine != nil {
+		config.ViewEngine = provided.ViewEngine
 	}
-}
-
-// ReadBufferSize specifies a per-connection buffer size.
-func ReadBufferSize(readBufferSize int) ServerOpt {
-	return func(config *ServerConfig) {
-		config.ReadBufferSize = readBufferSize
+	if provided.ViewLayout != "" {
+		config.ViewLayout = provided.ViewLayout
 	}
-}
-
-// WriteBufferSize specifies a per-connection buffer size for responses.
-func WriteBufferSize(writeBufferSize int) ServerOpt {
-	return func(config *ServerConfig) {
-		config.WriteBufferSize = writeBufferSize
+	if provided.Concurrency > 0 {
+		config.Concurrency = provided.Concurrency
 	}
+	if provided.BodyLimit > 0 {
+		config.BodyLimit = provided.BodyLimit
+	}
+	if provided.ReadBufferSize > 0 {
+		config.ReadBufferSize = provided.ReadBufferSize
+	}
+	if provided.WriteBufferSize > 0 {
+		config.WriteBufferSize = provided.WriteBufferSize
+	}
+	if provided.FiberOpt != nil {
+		config.FiberOpt = provided.FiberOpt
+	}
+
+	return config
 }

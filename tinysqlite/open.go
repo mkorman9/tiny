@@ -9,29 +9,27 @@ import (
 )
 
 // Open tries to open an instance of sqlite3 database and then return *gorm.DB instance to interact with it.
-func Open(dsn string, opts ...Opt) (*gorm.DB, error) {
-	config := Config{
-		Verbose: false,
+func Open(dsn string, config ...*Config) (*gorm.DB, error) {
+	var providedConfig *Config
+	if config != nil {
+		providedConfig = config[0]
 	}
-
-	for _, opt := range opts {
-		opt(&config)
-	}
+	c := mergeConfig(providedConfig)
 
 	if dsn == "" {
 		return nil, errors.New("DSN cannot be empty")
 	}
 
 	gormConfig := &gorm.Config{
-		Logger: &gormcommon.GormLogger{Verbose: config.Verbose},
+		Logger: &gormcommon.GormLogger{Verbose: c.Verbose},
 		NowFunc: func() time.Time {
 			return time.Now().UTC()
 		},
 		QueryFields: true,
 	}
 
-	for _, opt := range config.gormOpts {
-		opt(gormConfig)
+	if c.GormOpt != nil {
+		c.GormOpt(gormConfig)
 	}
 
 	db, err := gorm.Open(sqlite.Open(dsn), gormConfig)

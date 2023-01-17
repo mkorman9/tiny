@@ -82,8 +82,10 @@ func TestFramingHandlerFragmentedPacket(t *testing.T) {
 				assert.True(t, validateTestPayload(1024, packet), "packet should be valid")
 			}
 		},
-		ReadBufferSize(512),
-		MinReadSpace(256),
+		&PacketFramingConfig{
+			ReadBufferSize: 512,
+			MinReadSpace:   256,
+		},
 	)(socket)
 
 	assert.Equal(t, 1, receivedPackets, "received packets count must match")
@@ -111,8 +113,10 @@ func TestFramingHandlerTwoFragmentedPackets(t *testing.T) {
 				assert.True(t, validateTestPayload(512, packet), "packet should be valid")
 			}
 		},
-		ReadBufferSize(768),
-		MinReadSpace(100),
+		&PacketFramingConfig{
+			ReadBufferSize: 768,
+			MinReadSpace:   100,
+		},
 	)(socket)
 
 	assert.Equal(t, 2, receivedPackets, "received packets count must match")
@@ -166,7 +170,9 @@ func TestFramingHandlerPacketTooBig(t *testing.T) {
 				receivedPackets++
 			}
 		},
-		MaxPacketSize(512),
+		&PacketFramingConfig{
+			MaxPacketSize: 512,
+		},
 	)(socket)
 
 	assert.Equal(t, 0, receivedPackets, "received packets count must match")

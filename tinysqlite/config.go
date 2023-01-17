@@ -9,22 +9,23 @@ type Config struct {
 	// Verbose specifies whether to log all executed queries.
 	Verbose bool
 
-	gormOpts []func(*gorm.Config)
+	// GormOpt allows to specify custom function that will operate directly on *gorm.Config.
+	GormOpt func(*gorm.Config)
 }
 
-// Opt is an option to be specified to DialPostgres.
-type Opt = func(*Config)
+func mergeConfig(provided *Config) *Config {
+	config := &Config{}
 
-// Verbose tells client to log all executed queries.
-func Verbose() Opt {
-	return func(config *Config) {
+	if provided == nil {
+		return config
+	}
+
+	if provided.Verbose {
 		config.Verbose = true
 	}
-}
-
-// GormOpt adds an option to modify the default gorm.Config.
-func GormOpt(gormOpt func(*gorm.Config)) Opt {
-	return func(config *Config) {
-		config.gormOpts = append(config.gormOpts, gormOpt)
+	if provided.GormOpt != nil {
+		config.GormOpt = provided.GormOpt
 	}
+
+	return config
 }

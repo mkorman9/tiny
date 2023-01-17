@@ -4,8 +4,6 @@ import "crypto/tls"
 
 // ServerConfig holds a configuration for NewServer.
 type ServerConfig struct {
-	address string
-
 	// Network is a network parameter to pass to net.Listen (default: "tcp").
 	Network string
 
@@ -22,31 +20,32 @@ type ServerConfig struct {
 	TLSConfig *tls.Config
 }
 
-// ServerOpt is an option to be specified to NewServer.
-type ServerOpt func(*ServerConfig)
-
-// Network is a network parameter to pass to net.Listen.
-func Network(network string) ServerOpt {
-	return func(config *ServerConfig) {
-		config.Network = network
+func mergeServerConfig(provided *ServerConfig) *ServerConfig {
+	config := &ServerConfig{
+		Network:    "tcp",
+		MaxClients: -1,
+		TLSConfig:  &tls.Config{},
 	}
-}
 
-// MaxClients denotes the maximum number of connection that can be accepted at once, -1 for no limit.
-func MaxClients(maxClients int) ServerOpt {
-	return func(config *ServerConfig) {
-		config.MaxClients = maxClients
+	if provided == nil {
+		return config
 	}
-}
 
-// TLS enables TLS mode if both cert and key point to valid TLS credentials. tlsConfig is optional.
-func TLS(cert, key string, tlsConfig ...*tls.Config) ServerOpt {
-	return func(config *ServerConfig) {
-		config.TLSCert = cert
-		config.TLSKey = key
-
-		if tlsConfig != nil {
-			config.TLSConfig = tlsConfig[0]
-		}
+	if provided.Network != "" {
+		config.Network = provided.Network
 	}
+	if provided.MaxClients > -1 {
+		config.MaxClients = provided.MaxClients
+	}
+	if provided.TLSCert != "" {
+		config.TLSCert = provided.TLSCert
+	}
+	if provided.TLSKey != "" {
+		config.TLSKey = provided.TLSKey
+	}
+	if provided.TLSConfig != nil {
+		config.TLSConfig = provided.TLSConfig
+	}
+
+	return config
 }

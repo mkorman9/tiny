@@ -13,29 +13,28 @@ type Config struct {
 	// NoPing indicates whether Dial should skip the initial call to Ping method (default: false).
 	NoPing bool
 
-	redisOpts func(*redis.Options)
+	// RedisOpt allows to specify a function that operates directly on *redis.Options.
+	RedisOpt func(*redis.Options)
 }
 
-// Opt is an option to be specified to Dial.
-type Opt = func(*Config)
-
-// ConnectionTimeout is a maximum time client should spend trying to connect.
-func ConnectionTimeout(connectionTimeout time.Duration) Opt {
-	return func(config *Config) {
-		config.ConnectionTimeout = connectionTimeout
+func mergeConfig(provided *Config) *Config {
+	config := &Config{
+		ConnectionTimeout: 5 * time.Second,
 	}
-}
 
-// NoPing indicates that Dial should skip the initial call to Ping method.
-func NoPing() Opt {
-	return func(config *Config) {
+	if provided == nil {
+		return config
+	}
+
+	if provided.ConnectionTimeout > 0 {
+		config.ConnectionTimeout = provided.ConnectionTimeout
+	}
+	if provided.NoPing {
 		config.NoPing = true
 	}
-}
-
-// Options sets a function that allows to customize redis options.
-func Options(redisOpt func(options *redis.Options)) Opt {
-	return func(config *Config) {
-		config.redisOpts = redisOpt
+	if provided.RedisOpt != nil {
+		config.RedisOpt = provided.RedisOpt
 	}
+
+	return config
 }

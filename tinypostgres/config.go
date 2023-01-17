@@ -22,50 +22,40 @@ type Config struct {
 	// PoolMaxIdleTime is the maximum amount of time a connection may be idle (default: 30m).
 	PoolMaxIdleTime time.Duration
 
-	gormOpts []func(*gorm.Config)
+	// GormOpt allows to specify custom function that will operate directly on *gorm.Config.
+	GormOpt func(*gorm.Config)
 }
 
-// Opt is an option to be specified to Dial.
-type Opt = func(*Config)
+func mergeConfig(provided *Config) *Config {
+	config := &Config{
+		PoolMaxOpen:     10,
+		PoolMaxIdle:     5,
+		PoolMaxLifetime: time.Hour,
+		PoolMaxIdleTime: 30 * time.Minute,
+	}
 
-// Verbose tells client to log all executed queries.
-func Verbose() Opt {
-	return func(config *Config) {
+	if provided == nil {
+		return config
+	}
+
+	if provided.Verbose {
 		config.Verbose = true
 	}
-}
-
-// PoolMaxOpen is the maximum number of open connections to the database.
-func PoolMaxOpen(poolMaxOpen int) Opt {
-	return func(config *Config) {
-		config.PoolMaxOpen = poolMaxOpen
+	if provided.PoolMaxOpen > 0 {
+		config.PoolMaxOpen = provided.PoolMaxOpen
 	}
-}
-
-// PoolMaxIdle is the maximum number of connections in the idle connection pool.
-func PoolMaxIdle(poolMaxIdle int) Opt {
-	return func(config *Config) {
-		config.PoolMaxIdle = poolMaxIdle
+	if provided.PoolMaxIdle > 0 {
+		config.PoolMaxIdle = provided.PoolMaxIdle
 	}
-}
-
-// PoolMaxLifetime is the maximum amount of time a connection may be reused.
-func PoolMaxLifetime(poolMaxLifetime time.Duration) Opt {
-	return func(config *Config) {
-		config.PoolMaxLifetime = poolMaxLifetime
+	if provided.PoolMaxIdleTime > 0 {
+		config.PoolMaxIdleTime = provided.PoolMaxIdleTime
 	}
-}
-
-// PoolMaxIdleTime is the maximum amount of time a connection may be idle.
-func PoolMaxIdleTime(poolMaxIdleTime time.Duration) Opt {
-	return func(config *Config) {
-		config.PoolMaxIdleTime = poolMaxIdleTime
+	if provided.PoolMaxIdleTime > 0 {
+		config.PoolMaxIdleTime = provided.PoolMaxIdleTime
 	}
-}
-
-// GormOpt adds an option to modify the default gorm.Config.
-func GormOpt(gormOpt func(*gorm.Config)) Opt {
-	return func(config *Config) {
-		config.gormOpts = append(config.gormOpts, gormOpt)
+	if provided.GormOpt != nil {
+		config.GormOpt = provided.GormOpt
 	}
+
+	return config
 }

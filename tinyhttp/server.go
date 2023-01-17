@@ -9,7 +9,6 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/rs/zerolog/log"
 	"net"
-	"time"
 )
 
 // Server is an object representing fiber.App and implementing the tiny.Service interface.
@@ -17,41 +16,23 @@ type Server struct {
 	*fiber.App
 
 	config       *ServerConfig
+	address      string
 	errorHandler func(c *fiber.Ctx, err error) error
 	panicHandler func(c *fiber.Ctx, recovered any)
 }
 
 // NewServer creates new Server instance.
-func NewServer(address string, opts ...ServerOpt) *Server {
-	config := ServerConfig{
-		address:         address,
-		Network:         "tcp",
-		SecurityHeaders: true,
-		TLSConfig:       &tls.Config{},
-		ShutdownTimeout: 5 * time.Second,
-		ReadTimeout:     5 * time.Second,
-		WriteTimeout:    10 * time.Second,
-		IdleTimeout:     2 * time.Minute,
-		TrustedProxies: []string{
-			"10.0.0.0/8",
-			"172.16.0.0/12",
-			"192.168.0.0/16",
-			"127.0.0.0/8",
-			"fc00::/7",
-			"::1/128",
-		},
-		RemoteIPHeader:  "X-Forwarded-For",
-		Concurrency:     256 * 1024,
-		BodyLimit:       4 * 1024 * 1024,
-		ReadBufferSize:  4096,
-		WriteBufferSize: 4096,
+func NewServer(address string, config ...*ServerConfig) *Server {
+	var providedConfig *ServerConfig
+	if config != nil {
+		providedConfig = config[0]
 	}
+	c := mergeServerConfig(providedConfig)
 
-	for _, opt := range opts {
-		opt(&config)
+	server := &Server{
+		config:  c,
+		address: address,
 	}
-
-	server := &Server{config: &config}
 	server.App = server.createApp()
 
 	return server
@@ -59,7 +40,7 @@ func NewServer(address string, opts ...ServerOpt) *Server {
 
 // Start implements the interface of tiny.Service.
 func (s *Server) Start() error {
-	log.Info().Msgf("HTTP server started (%s)", s.config.address)
+	log.Info().Msgf("HTTP server started (%s)", s.address)
 
 	var listener net.Listener
 
@@ -74,14 +55,14 @@ func (s *Server) Start() error {
 		s.config.TLSConfig.GetCertificate = tlsHandler.GetClientInfo
 		s.SetTLSHandler(tlsHandler)
 
-		socket, err := tls.Listen(s.config.Network, s.config.address, s.config.TLSConfig)
+		socket, err := tls.Listen(s.config.Network, s.address, s.config.TLSConfig)
 		if err != nil {
 			return err
 		}
 
 		listener = socket
 	} else {
-		socket, err := net.Listen(s.config.Network, s.config.address)
+		socket, err := net.Listen(s.config.Network, s.address)
 		if err != nil {
 			return err
 		}
@@ -95,9 +76,9 @@ func (s *Server) Start() error {
 // Stop implements the interface of tiny.Service.
 func (s *Server) Stop() {
 	if err := s.ShutdownWithTimeout(s.config.ShutdownTimeout); err != nil {
-		log.Error().Err(err).Msgf("Error shutting down HTTP server (%s)", s.config.address)
+		log.Error().Err(err).Msgf("Error shutting down HTTP server (%s)", s.address)
 	} else {
-		log.Info().Msgf("HTTP server stopped (%s)", s.config.address)
+		log.Info().Msgf("HTTP server stopped (%s)", s.address)
 	}
 }
 
@@ -138,8 +119,8 @@ func (s *Server) createApp() *fiber.App {
 	}
 	appConfig.ProxyHeader = s.config.RemoteIPHeader
 
-	if s.config.fiberOption != nil {
-		s.config.fiberOption(&appConfig)
+	if s.config.FiberOpt != nil {
+		s.config.FiberOpt(&appConfig)
 	}
 
 	app := fiber.New(appConfig)

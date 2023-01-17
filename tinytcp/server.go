@@ -13,6 +13,7 @@ import (
 // Server represents a TCP server, and conforms to the tiny.Service interface.
 type Server struct {
 	config                 *ServerConfig
+	address                string
 	listener               net.Listener
 	forkingStrategy        ForkingStrategy
 	socketsListHead        *connectedSocketNode
@@ -35,20 +36,16 @@ type connectedSocketNode struct {
 }
 
 // NewServer returns new Server instance.
-func NewServer(address string, opts ...ServerOpt) *Server {
-	config := &ServerConfig{
-		address:    address,
-		Network:    "tcp",
-		MaxClients: -1,
-		TLSConfig:  &tls.Config{},
+func NewServer(address string, config ...*ServerConfig) *Server {
+	var providedConfig *ServerConfig
+	if config != nil {
+		providedConfig = config[0]
 	}
-
-	for _, opt := range opts {
-		opt(config)
-	}
+	c := mergeServerConfig(providedConfig)
 
 	return &Server{
-		config: config,
+		config:  c,
+		address: address,
 		connectedSocketPool: sync.Pool{
 			New: func() any {
 				return &ConnectedSocket{}
@@ -100,7 +97,7 @@ func (s *Server) Start() error {
 	go s.startBackgroundJob()
 	s.forkingStrategy.OnStart()
 
-	log.Info().Msgf("TCP server started (%s)", s.config.address)
+	log.Info().Msgf("TCP server started (%s)", s.address)
 
 	return s.acceptLoop()
 }
@@ -114,14 +111,14 @@ func (s *Server) startListener() error {
 
 		s.config.TLSConfig.Certificates = []tls.Certificate{cert}
 
-		socket, err := tls.Listen(s.config.Network, s.config.address, s.config.TLSConfig)
+		socket, err := tls.Listen(s.config.Network, s.address, s.config.TLSConfig)
 		if err != nil {
 			return err
 		}
 
 		s.listener = socket
 	} else {
-		socket, err := net.Listen(s.config.Network, s.config.address)
+		socket, err := net.Listen(s.config.Network, s.address)
 		if err != nil {
 			return err
 		}
@@ -158,7 +155,7 @@ func (s *Server) Stop() {
 	}
 
 	if err := s.listener.Close(); err != nil {
-		log.Error().Err(err).Msgf("Error shutting down TCP server (%s)", s.config.address)
+		log.Error().Err(err).Msgf("Error shutting down TCP server (%s)", s.address)
 	}
 
 	if s.ticker != nil {
@@ -172,7 +169,7 @@ func (s *Server) Stop() {
 
 	s.forkingStrategy.OnStop()
 
-	log.Info().Msgf("TCP server stopped (%s)", s.config.address)
+	log.Info().Msgf("TCP server stopped (%s)", s.address)
 }
 
 // Sockets returns a list of all client sockets currently connected.
