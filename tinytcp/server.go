@@ -15,7 +15,8 @@ type Server struct {
 	config                 *ServerConfig
 	listener               net.Listener
 	forkingStrategy        ForkingStrategy
-	sockets                map[*ConnectedSocket]struct{}
+	socketsListHead        *connectedSocketNode
+	socketsCount           int
 	socketsMutex           sync.RWMutex
 	ticker                 *time.Ticker
 	metrics                ServerMetrics
@@ -23,6 +24,13 @@ type Server struct {
 	connectedSocketPool    sync.Pool
 	byteCountingReaderPool sync.Pool
 	byteCountingWriterPool sync.Pool
+	socketNodesPool        sync.Pool
+}
+
+type connectedSocketNode struct {
+	socket *ConnectedSocket
+	prev   *connectedSocketNode
+	next   *connectedSocketNode
 }
 
 // NewServer returns new Server instance.
@@ -39,8 +47,9 @@ func NewServer(address string, opts ...ServerOpt) *Server {
 	}
 
 	return &Server{
-		config:  config,
-		sockets: make(map[*ConnectedSocket]struct{}),
+		config:          config,
+		socketsListHead: nil,
+		socketsCount:    0,
 		connectedSocketPool: sync.Pool{
 			New: func() any {
 				return &ConnectedSocket{}
@@ -54,6 +63,11 @@ func NewServer(address string, opts ...ServerOpt) *Server {
 		byteCountingWriterPool: sync.Pool{
 			New: func() any {
 				return &byteCountingWriter{}
+			},
+		},
+		socketNodesPool: sync.Pool{
+			New: func() any {
+				return &connectedSocketNode{}
 			},
 		},
 	}
@@ -163,10 +177,14 @@ func (s *Server) Sockets() []*ConnectedSocket {
 	defer s.socketsMutex.RUnlock()
 
 	var list []*ConnectedSocket
-	for socket := range s.sockets {
-		if !socket.IsClosed() {
-			list = append(list, socket)
+	var node = s.socketsListHead
+
+	for node != nil {
+		if !node.socket.IsClosed() {
+			list = append(list, node.socket)
 		}
+
+		node = node.next
 	}
 
 	return list
@@ -219,11 +237,21 @@ func (s *Server) registerConnectedSocket(socket *ConnectedSocket) bool {
 	s.socketsMutex.Lock()
 	defer s.socketsMutex.Unlock()
 
-	if s.config.MaxClients >= 0 && len(s.sockets) >= s.config.MaxClients {
+	if s.config.MaxClients >= 0 && s.socketsCount >= s.config.MaxClients {
 		return false
 	}
 
-	s.sockets[socket] = struct{}{}
+	node := s.socketNodesPool.Get().(*connectedSocketNode)
+	node.socket = socket
+
+	if s.socketsListHead == nil {
+		s.socketsListHead = node
+	} else {
+		s.socketsListHead.next = node
+		node.prev = s.socketsListHead
+	}
+
+	s.socketsCount++
 	return true
 }
 
@@ -252,7 +280,7 @@ func (s *Server) updateMetrics() {
 	s.socketsMutex.RLock()
 	defer s.socketsMutex.RUnlock()
 
-	s.metrics.Connections = len(s.sockets)
+	s.metrics.Connections = s.socketsCount
 
 	s.metrics.ReadsPerSecond = 0
 	s.metrics.WritesPerSecond = 0
@@ -261,7 +289,10 @@ func (s *Server) updateMetrics() {
 	}
 	s.forkingStrategy.OnMetricsUpdate(&s.metrics)
 
-	for socket := range s.sockets {
+	var node = s.socketsListHead
+	for node != nil {
+		socket := node.socket
+
 		reads := socket.ReadsPerSecond()
 		writes := socket.WritesPerSecond()
 
@@ -269,14 +300,19 @@ func (s *Server) updateMetrics() {
 		s.metrics.TotalWritten += writes
 		s.metrics.ReadsPerSecond += reads
 		s.metrics.WritesPerSecond += writes
+
+		node = node.next
 	}
 
 	if s.metricsUpdateHandler != nil {
 		s.metricsUpdateHandler()
 	}
 
-	for socket := range s.sockets {
+	node = s.socketsListHead
+	for node != nil {
+		socket := node.socket
 		socket.resetMetrics()
+		node = node.next
 	}
 }
 
@@ -284,10 +320,29 @@ func (s *Server) cleanupConnectedSockets() {
 	s.socketsMutex.Lock()
 	defer s.socketsMutex.Unlock()
 
-	for socket := range s.sockets {
+	var node = s.socketsListHead
+
+	for node != nil {
+		socket := node.socket
+
 		if socket.IsClosed() {
-			delete(s.sockets, socket)
+			if node == s.socketsListHead {
+				s.socketsListHead = node
+			} else {
+				node.prev.next = node.next
+				node.next.prev = node.prev
+			}
+
+			next := node.next
+			node.socket = nil
+			node.next = nil
+			node.prev = nil
+			s.socketNodesPool.Put(node)
+			node = next
+
 			s.recycleConnectedSocket(socket)
+		} else {
+			node = node.next
 		}
 	}
 }
