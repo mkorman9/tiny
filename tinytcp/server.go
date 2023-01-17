@@ -16,6 +16,7 @@ type Server struct {
 	listener               net.Listener
 	forkingStrategy        ForkingStrategy
 	socketsListHead        *connectedSocketNode
+	socketsListTail        *connectedSocketNode
 	socketsCount           int
 	socketsMutex           sync.RWMutex
 	ticker                 *time.Ticker
@@ -245,9 +246,10 @@ func (s *Server) registerConnectedSocket(socket *ConnectedSocket) bool {
 
 	if s.socketsListHead == nil {
 		s.socketsListHead = node
+		s.socketsListTail = node
 	} else {
-		s.socketsListHead.next = node
-		node.prev = s.socketsListHead
+		s.socketsListTail.next = node
+		node.prev = s.socketsListTail
 	}
 
 	s.socketsCount++
@@ -317,14 +319,15 @@ func (s *Server) cleanupConnectedSockets() {
 		next := node.next
 
 		if socket.IsClosed() {
-			if node == s.socketsListHead {
+			switch node {
+			case s.socketsListHead:
 				s.socketsListHead = node.next
-			} else {
+			case s.socketsListTail:
+				s.socketsListTail = node.prev
+				s.socketsListTail.next = nil
+			default:
 				node.prev.next = node.next
-
-				if node.next != nil {
-					node.next.prev = node.prev
-				}
+				node.next.prev = node.prev
 			}
 
 			node.socket = nil
