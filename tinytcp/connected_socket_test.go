@@ -1,69 +1,91 @@
 package tinytcp
 
 import (
+	"bytes"
+	"github.com/stretchr/testify/assert"
 	"io"
-	"net"
-	"time"
+	"testing"
 )
 
-// net.Addr
+func TestConnectedSocketInput(t *testing.T) {
+	// given
+	payload := []byte("Hello world!")
+	payloadSize := len(payload)
 
-type AddrMock struct {
+	in := bytes.NewBuffer(payload)
+	socket := MockConnectedSocket(in, io.Discard)
+
+	// when
+	buffer := make([]byte, payloadSize)
+	n, err := socket.Read(buffer)
+
+	// then
+	assert.Nil(t, err, "err should be nil")
+	assert.Equal(t, payloadSize, n, "n should equal to bytes read")
+	assert.Equal(t, payload, buffer, "payloads should match")
 }
 
-func (am *AddrMock) Network() string {
-	return "tcp"
+func TestConnectedSocketInputEOF(t *testing.T) {
+	// given
+	socket := MockConnectedSocket(&eofReader{}, io.Discard)
+
+	var closeHandlerCalled bool
+	socket.OnClose(func() {
+		closeHandlerCalled = true
+	})
+
+	// when
+	_, err := socket.Read(nil)
+
+	// then
+	assert.Error(t, io.EOF, err, "err should be equal to io.EOF")
+	assert.Truef(t, closeHandlerCalled, "close handler should be called")
 }
 
-func (am *AddrMock) String() string {
-	return "127.0.0.1:1234"
+func TestConnectedSocketOutput(t *testing.T) {
+	// given
+	payload := []byte("Hello world")
+	payloadSize := len(payload)
+
+	var out bytes.Buffer
+	socket := MockConnectedSocket(nil, &out)
+
+	// when
+	n, err := socket.Write(payload)
+
+	// then
+	assert.Nil(t, err, "err should be nil")
+	assert.Equal(t, payloadSize, n, "n should equal to bytes read")
+	assert.Equal(t, payload, out.Bytes(), "payloads should match")
 }
 
-// net.Conn
+func TestConnectedSocketOutputEOF(t *testing.T) {
+	// given
+	socket := MockConnectedSocket(nil, &eofWriter{})
 
-type ConnMock struct {
+	var closeHandlerCalled bool
+	socket.OnClose(func() {
+		closeHandlerCalled = true
+	})
+
+	// when
+	_, err := socket.Write(nil)
+
+	// then
+	assert.Error(t, io.EOF, err, "err should be equal to io.EOF")
+	assert.Truef(t, closeHandlerCalled, "close handler should be called")
 }
 
-func (cm *ConnMock) Read(_ []byte) (int, error) {
-	return 0, nil
+type eofReader struct {
 }
 
-func (cm *ConnMock) Write(_ []byte) (int, error) {
-	return 0, nil
+func (er *eofReader) Read(_ []byte) (int, error) {
+	return 0, io.EOF
 }
 
-func (cm *ConnMock) Close() error {
-	return nil
+type eofWriter struct {
 }
 
-func (cm *ConnMock) LocalAddr() net.Addr {
-	return &AddrMock{}
-}
-
-func (cm *ConnMock) RemoteAddr() net.Addr {
-	return &AddrMock{}
-}
-
-func (cm *ConnMock) SetDeadline(_ time.Time) error {
-	return nil
-}
-
-func (cm *ConnMock) SetReadDeadline(_ time.Time) error {
-	return nil
-}
-
-func (cm *ConnMock) SetWriteDeadline(_ time.Time) error {
-	return nil
-}
-
-// ConnectedSocket
-
-func MockConnectedSocket(in io.Reader, out io.Writer) *ConnectedSocket {
-	return &ConnectedSocket{
-		remoteAddress: "127.0.0.1",
-		connectedAt:   time.Now(),
-		connection:    &ConnMock{},
-		reader:        in,
-		writer:        out,
-	}
+func (ew *eofWriter) Write(_ []byte) (int, error) {
+	return 0, io.EOF
 }
