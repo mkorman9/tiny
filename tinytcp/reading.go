@@ -75,7 +75,7 @@ func ReadInt32(reader io.Reader, byteOrder ...binary.ByteOrder) (int32, error) {
 		order = byteOrder[0]
 	}
 
-	return int32(order.Uint16(b)), nil
+	return int32(order.Uint32(b)), nil
 }
 
 // ReadInt64 reads int64 from given reader.
@@ -90,7 +90,7 @@ func ReadInt64(reader io.Reader, byteOrder ...binary.ByteOrder) (int64, error) {
 		order = byteOrder[0]
 	}
 
-	return int64(order.Uint16(b)), nil
+	return int64(order.Uint64(b)), nil
 }
 
 // ReadVarInt reads var int from given reader.
