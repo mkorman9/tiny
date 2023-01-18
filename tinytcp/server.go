@@ -21,7 +21,6 @@ type Server struct {
 	sockets              *socketsList
 	ticker               *time.Ticker
 	abortOnce            sync.Once
-	jobRestarts          int
 	metrics              ServerMetrics
 	metricsUpdateHandler func()
 }
@@ -216,13 +215,7 @@ func (s *Server) startBackgroundJob() {
 				Err(fmt.Errorf("%v", r)).
 				Msg("Panic inside TCP server background job")
 
-			if s.jobRestarts < 3 {
-				s.jobRestarts++
-				s.startBackgroundJob()
-			} else {
-				log.Error().Msg("TCP server background job has reached its restarts limit, server going down")
-				s.Abort(errors.New("server background job restart loop"))
-			}
+			s.Abort(errors.New("server background job restart loop"))
 		}
 	}()
 
