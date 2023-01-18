@@ -14,9 +14,11 @@ type Server struct {
 	config               *ServerConfig
 	address              string
 	listener             net.Listener
+	errorChannel         chan error
 	forkingStrategy      ForkingStrategy
 	sockets              *socketsList
 	ticker               *time.Ticker
+	jobRestarts          int
 	metrics              ServerMetrics
 	metricsUpdateHandler func()
 }
@@ -30,9 +32,10 @@ func NewServer(address string, config ...*ServerConfig) *Server {
 	c := mergeServerConfig(providedConfig)
 
 	return &Server{
-		config:  c,
-		address: address,
-		sockets: newSocketsList(c.MaxClients),
+		config:       c,
+		address:      address,
+		errorChannel: make(chan error, 1),
+		sockets:      newSocketsList(c.MaxClients),
 	}
 }
 
@@ -112,7 +115,15 @@ func (s *Server) acceptLoop() error {
 		s.handleNewConnection(connection)
 	}
 
-	return nil
+	var err error
+	select {
+	case e := <-s.errorChannel:
+		err = e
+	default:
+		err = nil
+	}
+
+	return err
 }
 
 // Stop implements the interface of tiny.Service.
@@ -122,8 +133,11 @@ func (s *Server) Stop() {
 	}
 
 	if err := s.listener.Close(); err != nil {
-		log.Error().Err(err).Msgf("Error shutting down TCP server (%s)", s.address)
+		if !isBrokenPipe(err) {
+			log.Error().Err(err).Msgf("Error shutting down TCP server (%s)", s.address)
+		}
 	}
+	s.listener = nil
 
 	if s.ticker != nil {
 		s.ticker.Stop()
@@ -137,6 +151,16 @@ func (s *Server) Stop() {
 	s.forkingStrategy.OnStop()
 
 	log.Info().Msgf("TCP server stopped (%s)", s.address)
+}
+
+// Abort immediately stops the server with error.
+func (s *Server) Abort(err error) {
+	select {
+	case s.errorChannel <- err:
+	default:
+	}
+
+	s.Stop()
 }
 
 // Sockets returns a list of all client sockets currently connected.
@@ -172,10 +196,20 @@ func (s *Server) startBackgroundJob() {
 				Stack().
 				Err(fmt.Errorf("%v", r)).
 				Msg("Panic inside TCP server background job")
+
+			if s.jobRestarts < 3 {
+				s.jobRestarts++
+				s.startBackgroundJob()
+			} else {
+				log.Error().Msg("TCP server background job has reached its restarts limit, server going down")
+				s.Abort(errors.New("server background job restart loop"))
+			}
 		}
 	}()
 
-	s.ticker = time.NewTicker(1 * time.Second)
+	if s.ticker == nil {
+		s.ticker = time.NewTicker(1 * time.Second)
+	}
 
 	for {
 		select {
