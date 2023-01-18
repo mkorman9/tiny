@@ -1,7 +1,7 @@
 package tinylog
 
 import (
-	"github.com/rs/zerolog"
+	"github.com/mattn/go-isatty"
 	"io"
 	"os"
 )
@@ -19,17 +19,17 @@ const (
 
 // Config represents a configuration of the global logger.
 type Config struct {
-	// Level is a log level to enable (default: InfoLevel).
-	Level zerolog.Level
+	// Level is a log level to enable (default: info).
+	Level string
 
 	// TimeFormat specifies time format to use (default: "2006-01-02 15:04:05")
 	TimeFormat string
 
 	// Console is an instance of ConsoleConfig.
-	Console ConsoleConfig
+	Console *ConsoleConfig
 
 	// File is an instance of FileConfig.
-	File FileConfig
+	File *FileConfig
 
 	// Fields is a set of fields to include in each log line.
 	Fields map[string]string
@@ -37,14 +37,15 @@ type Config struct {
 
 // ConsoleConfig represents a configuration for console output. This output is emitted to os.Stderr.
 type ConsoleConfig struct {
-	// Enabled decides whether this output should be enabled or not (default: true).
-	Enabled bool
+	// Disabled decides whether this output should be disabled or not (default: false).
+	Disabled bool
 
 	// Output is a writer to write logs to (default: os.Stderr).
 	Output io.Writer
 
-	// Colors decides whether logging output should be colored or not (default: true for interactive terminals).
-	Colors bool
+	// ColorsDisabled decides whether logging output should be colored or not.
+	// (default: false for interactive terminals, true for others).
+	ColorsDisabled bool
 
 	// Format is a format of this output. It could be either LogText or LogJSON (default: LogText).
 	Format LogFormat
@@ -68,144 +69,66 @@ type FileConfig struct {
 	Format LogFormat
 }
 
-// Opt is an option to be specified to SetupLogger.
-type Opt func(*Config)
+func mergeConfig(provided *Config) *Config {
+	config := &Config{
+		Level:      "info",
+		TimeFormat: "2006-01-02 15:04:05",
+		Console: &ConsoleConfig{
+			Disabled:       false,
+			Output:         defaultOutput,
+			ColorsDisabled: !isatty.IsTerminal(os.Stdout.Fd()),
+			Format:         LogText,
+		},
+		File: &FileConfig{
+			Enabled:   false,
+			Location:  "log.txt",
+			Format:    LogText,
+			FileFlags: os.O_WRONLY | os.O_CREATE | os.O_APPEND,
+			FileMode:  0666,
+		},
+	}
 
-// Level sets logging level to enable.
-func Level(level string) Opt {
-	return func(config *Config) {
-		levelParsed, err := zerolog.ParseLevel(level)
-		if err == nil {
-			config.Level = levelParsed
+	if provided == nil {
+		return config
+	}
+
+	if provided.Level != "" {
+		config.Level = provided.Level
+	}
+	if provided.TimeFormat != "" {
+		config.TimeFormat = provided.TimeFormat
+	}
+	if provided.Console != nil {
+		if provided.Console.Disabled {
+			config.Console.Disabled = true
+		}
+		if provided.Console.Output != nil {
+			config.Console.Output = provided.Console.Output
+		}
+		if provided.Console.ColorsDisabled {
+			config.Console.ColorsDisabled = true
+		}
+		if provided.Console.Format != "" {
+			config.Console.Format = provided.Console.Format
 		}
 	}
-}
-
-// LevelDebug sets logging level to DebugLevel
-func LevelDebug() Opt {
-	return func(config *Config) {
-		config.Level = zerolog.DebugLevel
-	}
-}
-
-// LevelInfo sets logging level to InfoLevel
-func LevelInfo() Opt {
-	return func(config *Config) {
-		config.Level = zerolog.InfoLevel
-	}
-}
-
-// LevelWarn sets logging level to WarnLevel
-func LevelWarn() Opt {
-	return func(config *Config) {
-		config.Level = zerolog.WarnLevel
-	}
-}
-
-// LevelError sets logging level to ErrorLevel
-func LevelError() Opt {
-	return func(config *Config) {
-		config.Level = zerolog.ErrorLevel
-	}
-}
-
-// LevelFatal sets logging level to FatalLevel
-func LevelFatal() Opt {
-	return func(config *Config) {
-		config.Level = zerolog.FatalLevel
-	}
-}
-
-// TimeFormat specifies time format to use
-func TimeFormat(format string) Opt {
-	return func(config *Config) {
-		config.TimeFormat = format
-	}
-}
-
-// Fields adds custom fields to the logger.
-func Fields(fields map[string]string) Opt {
-	return func(config *Config) {
-		if config.Fields == nil {
-			config.Fields = make(map[string]string)
+	if provided.File != nil {
+		if provided.File.Enabled {
+			config.File.Enabled = true
 		}
-
-		for key, value := range fields {
-			config.Fields[key] = value
+		if provided.File.Location != "" {
+			config.File.Location = provided.File.Location
+		}
+		if provided.File.Format != "" {
+			config.File.Format = provided.File.Format
+		}
+		if provided.File.FileFlags != 0 {
+			config.File.FileFlags = provided.File.FileFlags
+		}
+		if provided.File.FileMode != 0 {
+			config.File.FileMode = provided.File.FileMode
 		}
 	}
-}
 
-// Field adds a custom field to the logger.
-func Field(name, value string) Opt {
-	return func(config *Config) {
-		if config.Fields == nil {
-			config.Fields = make(map[string]string)
-		}
-
-		config.Fields[name] = value
-	}
-}
-
-// ConsoleEnabled sets Enabled parameter of the console output.
-func ConsoleEnabled(enabled bool) Opt {
-	return func(config *Config) {
-		config.Console.Enabled = enabled
-	}
-}
-
-// ConsoleOutput sets the writer to write logs to.
-func ConsoleOutput(output io.Writer) Opt {
-	return func(config *Config) {
-		config.Console.Output = output
-	}
-}
-
-// ConsoleColors sets Colors parameter of the console output.
-func ConsoleColors(colors bool) Opt {
-	return func(config *Config) {
-		config.Console.Colors = colors
-	}
-}
-
-// ConsoleFormat sets Format parameter of the console output.
-func ConsoleFormat(format LogFormat) Opt {
-	return func(config *Config) {
-		config.Console.Format = format
-	}
-}
-
-// FileEnabled sets Enabled parameter of the file output.
-func FileEnabled(enabled bool) Opt {
-	return func(config *Config) {
-		config.File.Enabled = enabled
-	}
-}
-
-// FileLocation sets Location parameter of the file output.
-func FileLocation(location string) Opt {
-	return func(config *Config) {
-		config.File.Location = location
-	}
-}
-
-// FileFlags specifies what flags to use when opening file.
-func FileFlags(flags int) Opt {
-	return func(config *Config) {
-		config.File.FileFlags = flags
-	}
-}
-
-// FileMode specifies what mode to use when opening file.
-func FileMode(mode os.FileMode) Opt {
-	return func(config *Config) {
-		config.File.FileMode = mode
-	}
-}
-
-// FileFormat sets Format parameter of the file output.
-func FileFormat(format LogFormat) Opt {
-	return func(config *Config) {
-		config.File.Format = format
-	}
+	return config
 }

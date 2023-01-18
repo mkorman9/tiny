@@ -2,7 +2,6 @@ package tinylog
 
 import (
 	"fmt"
-	"github.com/mattn/go-isatty"
 	"io"
 	"os"
 	"runtime"
@@ -15,37 +14,25 @@ import (
 var defaultOutput = os.Stderr
 
 // SetupLogger configures the global instance of zerolog.Logger.
-// Default configuration can be overwritten by providing custom options as arguments.
-func SetupLogger(opts ...Opt) {
-	config := &Config{
-		Level:      zerolog.InfoLevel,
-		TimeFormat: "2006-01-02 15:04:05",
-		Console: ConsoleConfig{
-			Enabled: true,
-			Output:  defaultOutput,
-			Colors:  isatty.IsTerminal(os.Stdout.Fd()),
-			Format:  LogText,
-		},
-		File: FileConfig{
-			Enabled:   false,
-			Location:  "log.txt",
-			Format:    LogText,
-			FileFlags: os.O_WRONLY | os.O_CREATE | os.O_APPEND,
-			FileMode:  0666,
-		},
+func SetupLogger(config ...*Config) {
+	var providedConfig *Config
+	if config != nil {
+		providedConfig = config[0]
 	}
+	c := mergeConfig(providedConfig)
 
-	for _, opt := range opts {
-		opt(config)
-	}
-
-	configureSettings(config)
-	_ = configureWriters(config)
-	configureFields(config)
+	configureSettings(c)
+	_ = configureWriters(c)
+	configureFields(c)
 }
 
 func configureSettings(config *Config) {
-	zerolog.SetGlobalLevel(config.Level)
+	level, err := zerolog.ParseLevel(config.Level)
+	if err == nil {
+		level = zerolog.InfoLevel
+	}
+
+	zerolog.SetGlobalLevel(level)
 	zerolog.TimestampFunc = func() time.Time {
 		return time.Now().UTC()
 	}
@@ -58,11 +45,11 @@ func configureSettings(config *Config) {
 func configureWriters(config *Config) error {
 	var writers []io.Writer
 
-	if config.Console.Enabled {
+	if !config.Console.Disabled {
 		writer, err := createFormattedWriter(
 			config.Console.Output,
 			config.Console.Format,
-			config.Console.Colors,
+			config.Console.ColorsDisabled,
 			config.TimeFormat,
 		)
 		if err != nil {
@@ -80,7 +67,7 @@ func configureWriters(config *Config) error {
 			return err
 		}
 
-		writer, err := createFormattedWriter(fileWriter, config.File.Format, false, config.TimeFormat)
+		writer, err := createFormattedWriter(fileWriter, config.File.Format, true, config.TimeFormat)
 		if err != nil {
 			_, _ = fmt.Fprintf(config.Console.Output, "Failed to configure file logger: %v\n", err)
 			return err
@@ -108,11 +95,11 @@ func configureFields(config *Config) {
 	}
 }
 
-func createFormattedWriter(output io.Writer, format string, colors bool, timeFormat string) (io.Writer, error) {
+func createFormattedWriter(output io.Writer, format string, noColors bool, timeFormat string) (io.Writer, error) {
 	if format == LogText {
 		formattedOutput := zerolog.ConsoleWriter{
 			Out:        output,
-			NoColor:    !colors,
+			NoColor:    noColors,
 			TimeFormat: timeFormat,
 		}
 
