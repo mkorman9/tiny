@@ -6,10 +6,8 @@ import (
 	"io"
 	"os"
 	"runtime"
-	"strings"
 	"time"
 
-	"github.com/mkorman9/tiny/tinylog/gelf"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -34,10 +32,6 @@ func SetupLogger(opts ...Opt) {
 			Format:    LogText,
 			FileFlags: os.O_WRONLY | os.O_CREATE | os.O_APPEND,
 			FileMode:  0666,
-		},
-		Gelf: GelfConfig{
-			Enabled: false,
-			Address: "",
 		},
 	}
 
@@ -95,22 +89,6 @@ func configureWriters(config *Config) error {
 		writers = append(writers, writer)
 	}
 
-	if config.Gelf.Enabled {
-		gelfWriter, err := gelf.NewWriter(config.Gelf.Address)
-		if err != nil {
-			_, _ = fmt.Fprintf(config.Console.Output, "Failed to create gelf logger connection: %v\n", err)
-			return err
-		}
-
-		writer, err := createFormattedWriter(gelfWriter, LogJSON, false, config.TimeFormat)
-		if err != nil {
-			_, _ = fmt.Fprintf(config.Console.Output, "Failed to configure gelf logger: %v\n", err)
-			return err
-		}
-
-		writers = append(writers, writer)
-	}
-
 	if len(writers) != 0 {
 		log.Logger = log.Output(zerolog.MultiLevelWriter(writers...))
 	}
@@ -119,10 +97,10 @@ func configureWriters(config *Config) error {
 }
 
 func configureFields(config *Config) {
-	if len(config.fields) != 0 {
+	if len(config.Fields) != 0 {
 		ctx := log.Logger.With()
 
-		for name, value := range config.fields {
+		for name, value := range config.Fields {
 			ctx = ctx.Str(name, value)
 		}
 
@@ -146,8 +124,8 @@ func createFormattedWriter(output io.Writer, format string, colors bool, timeFor
 	}
 }
 
-func stackTraceMarshaller(err error) interface{} {
-	var stackTrace []string
+func stackTraceMarshaller(_ error) interface{} {
+	var stackTrace []map[string]string
 
 	for i := 3; ; i++ {
 		pc, file, line, ok := runtime.Caller(i)
@@ -156,8 +134,11 @@ func stackTraceMarshaller(err error) interface{} {
 		}
 		fn := runtime.FuncForPC(pc)
 
-		stackTrace = append(stackTrace, fmt.Sprintf("%v:%v (%v)", file, line, fn.Name()))
+		stackTrace = append(stackTrace, map[string]string{
+			"src":  fmt.Sprintf("%v:%v", file, line),
+			"func": fn.Name(),
+		})
 	}
 
-	return strings.Join(stackTrace, ", ")
+	return stackTrace
 }

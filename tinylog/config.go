@@ -31,10 +31,8 @@ type Config struct {
 	// File is an instance of FileConfig.
 	File FileConfig
 
-	// Gelf is an instance of GelfConfig.
-	Gelf GelfConfig
-
-	fields map[string]string
+	// Fields is a set of fields to include in each log line.
+	Fields map[string]string
 }
 
 // ConsoleConfig represents a configuration for console output. This output is emitted to os.Stderr.
@@ -68,15 +66,6 @@ type FileConfig struct {
 
 	// Format is a format of this output. It could be either LogText or LogJSON (default: LogText).
 	Format LogFormat
-}
-
-// GelfConfig represents a configuration for gelf output. This output is emitted to a UDP socket.
-type GelfConfig struct {
-	// Enabled decides whether this output should be enabled or not (default: false).
-	Enabled bool
-
-	// Address is an address of the UDP socket in format HOST:PORT.
-	Address string
 }
 
 // Opt is an option to be specified to SetupLogger.
@@ -137,12 +126,12 @@ func TimeFormat(format string) Opt {
 // Fields adds custom fields to the logger.
 func Fields(fields map[string]string) Opt {
 	return func(config *Config) {
-		if config.fields == nil {
-			config.fields = make(map[string]string)
+		if config.Fields == nil {
+			config.Fields = make(map[string]string)
 		}
 
 		for key, value := range fields {
-			config.fields[key] = value
+			config.Fields[key] = value
 		}
 	}
 }
@@ -150,11 +139,11 @@ func Fields(fields map[string]string) Opt {
 // Field adds a custom field to the logger.
 func Field(name, value string) Opt {
 	return func(config *Config) {
-		if config.fields == nil {
-			config.fields = make(map[string]string)
+		if config.Fields == nil {
+			config.Fields = make(map[string]string)
 		}
 
-		config.fields[name] = value
+		config.Fields[name] = value
 	}
 }
 
@@ -218,19 +207,5 @@ func FileMode(mode os.FileMode) Opt {
 func FileFormat(format LogFormat) Opt {
 	return func(config *Config) {
 		config.File.Format = format
-	}
-}
-
-// GelfEnabled sets Enabled parameter of the gelf output.
-func GelfEnabled(enabled bool) Opt {
-	return func(config *Config) {
-		config.Gelf.Enabled = enabled
-	}
-}
-
-// GelfAddress sets Address parameter of the gelf output.
-func GelfAddress(address string) Opt {
-	return func(config *Config) {
-		config.Gelf.Address = address
 	}
 }
