@@ -7,13 +7,13 @@ import (
 	"testing"
 )
 
-func TestConnectedSocketInput(t *testing.T) {
+func TestSocketInput(t *testing.T) {
 	// given
 	payload := []byte("Hello world!")
 	payloadSize := len(payload)
 
 	in := bytes.NewBuffer(payload)
-	socket := MockConnectedSocket(in, io.Discard)
+	socket := MockSocket(in, io.Discard)
 
 	// when
 	buffer := make([]byte, payloadSize)
@@ -25,9 +25,9 @@ func TestConnectedSocketInput(t *testing.T) {
 	assert.Equal(t, payload, buffer, "payloads should match")
 }
 
-func TestConnectedSocketInputEOF(t *testing.T) {
+func TestSocketInputEOF(t *testing.T) {
 	// given
-	socket := MockConnectedSocket(&eofReader{}, io.Discard)
+	socket := MockSocket(&eofReader{}, io.Discard)
 
 	var closeHandlerCalled bool
 	socket.OnClose(func() {
@@ -42,13 +42,13 @@ func TestConnectedSocketInputEOF(t *testing.T) {
 	assert.Truef(t, closeHandlerCalled, "close handler should be called")
 }
 
-func TestConnectedSocketOutput(t *testing.T) {
+func TestSocketOutput(t *testing.T) {
 	// given
 	payload := []byte("Hello world")
 	payloadSize := len(payload)
 
 	var out bytes.Buffer
-	socket := MockConnectedSocket(nil, &out)
+	socket := MockSocket(nil, &out)
 
 	// when
 	n, err := socket.Write(payload)
@@ -59,9 +59,9 @@ func TestConnectedSocketOutput(t *testing.T) {
 	assert.Equal(t, payload, out.Bytes(), "payloads should match")
 }
 
-func TestConnectedSocketOutputEOF(t *testing.T) {
+func TestSocketOutputEOF(t *testing.T) {
 	// given
-	socket := MockConnectedSocket(nil, &eofWriter{})
+	socket := MockSocket(nil, &eofWriter{})
 
 	var closeHandlerCalled bool
 	socket.OnClose(func() {

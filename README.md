@@ -40,7 +40,7 @@ func main() {
 		config.String("tcp.address", "0.0.0.0:7000"),
 	)
 	tcpServer.ForkingStrategy(tinytcp.GoroutinePerConnection(
-		func(socket *tinytcp.ConnectedSocket) {
+		func(socket *tinytcp.Socket) {
 			socket.Write([]byte("Hello world!"))
 			socket.Close()
 		},

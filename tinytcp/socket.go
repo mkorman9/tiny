@@ -10,8 +10,8 @@ import (
 	"time"
 )
 
-// ConnectedSocket represents a dedicated socket for given TCP client.
-type ConnectedSocket struct {
+// Socket represents a dedicated socket for given TCP client.
+type Socket struct {
 	remoteAddress      string
 	connectedAt        time.Time
 	connection         net.Conn
@@ -25,57 +25,57 @@ type ConnectedSocket struct {
 	closeHandlersMutex sync.RWMutex
 }
 
-// ConnectedSocketHandler represents a signature of function used by Server to handle new connections.
-type ConnectedSocketHandler func(*ConnectedSocket)
+// SocketHandler represents a signature of function used by Server to handle new connections.
+type SocketHandler func(*Socket)
 
-func (cs *ConnectedSocket) reset() {
-	cs.remoteAddress = ""
-	cs.connection = nil
-	cs.reader = nil
-	cs.writer = nil
-	cs.byteCountingReader = nil
-	cs.byteCountingWriter = nil
-	cs.isClosed = 0
-	cs.closeOnce = sync.Once{}
-	cs.closeHandlers = nil
-	cs.closeHandlersMutex = sync.RWMutex{}
+func (s *Socket) reset() {
+	s.remoteAddress = ""
+	s.connection = nil
+	s.reader = nil
+	s.writer = nil
+	s.byteCountingReader = nil
+	s.byteCountingWriter = nil
+	s.isClosed = 0
+	s.closeOnce = sync.Once{}
+	s.closeHandlers = nil
+	s.closeHandlersMutex = sync.RWMutex{}
 }
 
 // RemoteAddress returns a remote address of the socket.
-func (cs *ConnectedSocket) RemoteAddress() string {
-	return cs.remoteAddress
+func (s *Socket) RemoteAddress() string {
+	return s.remoteAddress
 }
 
 // ConnectedAt returns an exact time the socket has connected.
-func (cs *ConnectedSocket) ConnectedAt() time.Time {
-	return cs.connectedAt
+func (s *Socket) ConnectedAt() time.Time {
+	return s.connectedAt
 }
 
 // IsClosed check whether this connection has been closed, either by the server or the client.
-func (cs *ConnectedSocket) IsClosed() bool {
-	return atomic.LoadUint32(&cs.isClosed) == 1
+func (s *Socket) IsClosed() bool {
+	return atomic.LoadUint32(&s.isClosed) == 1
 }
 
 // Close closes underlying TCP connection and executes all the registered close handlers.
 // This method always returns nil, but its signature is meant to stick to the io.Closer interface.
-func (cs *ConnectedSocket) Close() error {
-	cs.closeOnce.Do(func() {
-		atomic.StoreUint32(&cs.isClosed, 1)
+func (s *Socket) Close() error {
+	s.closeOnce.Do(func() {
+		atomic.StoreUint32(&s.isClosed, 1)
 
 		log.Debug().
-			Msgf("Closing TCP client connection: %s", cs.connection.RemoteAddr().String())
+			Msgf("Closing TCP client connection: %s", s.connection.RemoteAddr().String())
 
-		if err := cs.connection.Close(); err != nil {
+		if err := s.connection.Close(); err != nil {
 			log.Error().
 				Err(err).
-				Msgf("Error while closing TCP client connection: %s", cs.connection.RemoteAddr().String())
+				Msgf("Error while closing TCP client connection: %s", s.connection.RemoteAddr().String())
 		}
 
-		cs.closeHandlersMutex.RLock()
-		defer cs.closeHandlersMutex.RUnlock()
+		s.closeHandlersMutex.RLock()
+		defer s.closeHandlersMutex.RUnlock()
 
-		for i := len(cs.closeHandlers) - 1; i >= 0; i-- {
-			handler := cs.closeHandlers[i]
+		for i := len(s.closeHandlers) - 1; i >= 0; i-- {
+			handler := s.closeHandlers[i]
 			handler()
 		}
 	})
@@ -84,19 +84,19 @@ func (cs *ConnectedSocket) Close() error {
 }
 
 // Read conforms to the io.Reader interface.
-func (cs *ConnectedSocket) Read(b []byte) (int, error) {
-	n, err := cs.reader.Read(b)
+func (s *Socket) Read(b []byte) (int, error) {
+	n, err := s.reader.Read(b)
 	if err != nil {
 		if isBrokenPipe(err) {
 			log.Debug().
-				Msgf("Connection closed by TCP client: %s", cs.connection.RemoteAddr().String())
-			_ = cs.Close()
+				Msgf("Connection closed by TCP client: %s", s.connection.RemoteAddr().String())
+			_ = s.Close()
 		} else if isTimeout(err) {
 			// ignore
 		} else {
 			log.Error().
 				Err(err).
-				Msgf("Error while reading from TCP client connection: %s", cs.connection.RemoteAddr().String())
+				Msgf("Error while reading from TCP client connection: %s", s.connection.RemoteAddr().String())
 		}
 
 		return n, err
@@ -106,19 +106,19 @@ func (cs *ConnectedSocket) Read(b []byte) (int, error) {
 }
 
 // Write conforms to the io.Writer interface.
-func (cs *ConnectedSocket) Write(b []byte) (int, error) {
-	n, err := cs.writer.Write(b)
+func (s *Socket) Write(b []byte) (int, error) {
+	n, err := s.writer.Write(b)
 	if err != nil {
 		if isBrokenPipe(err) {
 			log.Debug().
-				Msgf("Connection closed by TCP client: %s", cs.connection.RemoteAddr().String())
-			_ = cs.Close()
+				Msgf("Connection closed by TCP client: %s", s.connection.RemoteAddr().String())
+			_ = s.Close()
 		} else if isTimeout(err) {
 			// ignore
 		} else {
 			log.Error().
 				Err(err).
-				Msgf("Error while writing to TCP client connection: %s", cs.connection.RemoteAddr().String())
+				Msgf("Error while writing to TCP client connection: %s", s.connection.RemoteAddr().String())
 		}
 
 		return n, err
@@ -128,19 +128,19 @@ func (cs *ConnectedSocket) Write(b []byte) (int, error) {
 }
 
 // SetReadDeadline sets read deadline for underlying socket.
-func (cs *ConnectedSocket) SetReadDeadline(deadline time.Time) error {
-	err := cs.connection.SetReadDeadline(deadline)
+func (s *Socket) SetReadDeadline(deadline time.Time) error {
+	err := s.connection.SetReadDeadline(deadline)
 	if err != nil {
 		if isBrokenPipe(err) {
 			log.Debug().
-				Msgf("Connection closed by TCP client: %s", cs.connection.RemoteAddr().String())
-			_ = cs.Close()
+				Msgf("Connection closed by TCP client: %s", s.connection.RemoteAddr().String())
+			_ = s.Close()
 		} else if isTimeout(err) {
 			// ignore
 		} else {
 			log.Error().
 				Err(err).
-				Msgf("Error while setting read deadline for TCP client connection: %s", cs.connection.RemoteAddr().String())
+				Msgf("Error while setting read deadline for TCP client connection: %s", s.connection.RemoteAddr().String())
 		}
 
 		return err
@@ -150,19 +150,19 @@ func (cs *ConnectedSocket) SetReadDeadline(deadline time.Time) error {
 }
 
 // SetWriteDeadline sets read deadline for underlying socket.
-func (cs *ConnectedSocket) SetWriteDeadline(deadline time.Time) error {
-	err := cs.connection.SetWriteDeadline(deadline)
+func (s *Socket) SetWriteDeadline(deadline time.Time) error {
+	err := s.connection.SetWriteDeadline(deadline)
 	if err != nil {
 		if isBrokenPipe(err) {
 			log.Debug().
-				Msgf("Connection closed by TCP client: %s", cs.connection.RemoteAddr().String())
-			_ = cs.Close()
+				Msgf("Connection closed by TCP client: %s", s.connection.RemoteAddr().String())
+			_ = s.Close()
 		} else if isTimeout(err) {
 			// ignore
 		} else {
 			log.Error().
 				Err(err).
-				Msgf("Error while setting write deadline for TCP client connection: %s", cs.connection.RemoteAddr().String())
+				Msgf("Error while setting write deadline for TCP client connection: %s", s.connection.RemoteAddr().String())
 		}
 
 		return err
@@ -172,21 +172,21 @@ func (cs *ConnectedSocket) SetWriteDeadline(deadline time.Time) error {
 }
 
 // OnClose registers a handler that is called when underlying TCP connection is being closed.
-func (cs *ConnectedSocket) OnClose(handler func()) {
-	cs.closeHandlersMutex.Lock()
-	defer cs.closeHandlersMutex.Unlock()
+func (s *Socket) OnClose(handler func()) {
+	s.closeHandlersMutex.Lock()
+	defer s.closeHandlersMutex.Unlock()
 
-	cs.closeHandlers = append(cs.closeHandlers, handler)
+	s.closeHandlers = append(s.closeHandlers, handler)
 }
 
-// Unwrap returns underlying net.Conn instance from ConnectedSocket.
-func (cs *ConnectedSocket) Unwrap() net.Conn {
-	return cs.connection
+// Unwrap returns underlying net.Conn instance from Socket.
+func (s *Socket) Unwrap() net.Conn {
+	return s.connection
 }
 
-// UnwrapTLS tries to return underlying tls.Conn instance from ConnectedSocket.
-func (cs *ConnectedSocket) UnwrapTLS() (*tls.Conn, bool) {
-	if conn, ok := cs.connection.(*tls.Conn); ok {
+// UnwrapTLS tries to return underlying tls.Conn instance from Socket.
+func (s *Socket) UnwrapTLS() (*tls.Conn, bool) {
+	if conn, ok := s.connection.(*tls.Conn); ok {
 		return conn, true
 	}
 
@@ -194,36 +194,36 @@ func (cs *ConnectedSocket) UnwrapTLS() (*tls.Conn, bool) {
 }
 
 // WrapReader allows to wrap reader object into user defined wrapper.
-func (cs *ConnectedSocket) WrapReader(wrapper func(io.Reader) io.Reader) {
-	cs.reader = wrapper(cs.reader)
+func (s *Socket) WrapReader(wrapper func(io.Reader) io.Reader) {
+	s.reader = wrapper(s.reader)
 }
 
 // WrapWriter allows to wrap writer object into user defined wrapper.
-func (cs *ConnectedSocket) WrapWriter(wrapper func(io.Writer) io.Writer) {
-	cs.writer = wrapper(cs.writer)
+func (s *Socket) WrapWriter(wrapper func(io.Writer) io.Writer) {
+	s.writer = wrapper(s.writer)
 }
 
 // TotalRead returns a total number of bytes read through this socket.
-func (cs *ConnectedSocket) TotalRead() uint64 {
-	return cs.byteCountingReader.Total()
+func (s *Socket) TotalRead() uint64 {
+	return s.byteCountingReader.Total()
 }
 
 // ReadsPerSecond returns a total number of bytes read through socket this second.
-func (cs *ConnectedSocket) ReadsPerSecond() uint64 {
-	return cs.byteCountingReader.Current()
+func (s *Socket) ReadsPerSecond() uint64 {
+	return s.byteCountingReader.Current()
 }
 
 // TotalWritten returns a total number of bytes written through this socket.
-func (cs *ConnectedSocket) TotalWritten() uint64 {
-	return cs.byteCountingWriter.Total()
+func (s *Socket) TotalWritten() uint64 {
+	return s.byteCountingWriter.Total()
 }
 
 // WritesPerSecond returns a total number of bytes written through socket this second.
-func (cs *ConnectedSocket) WritesPerSecond() uint64 {
-	return cs.byteCountingWriter.Current()
+func (s *Socket) WritesPerSecond() uint64 {
+	return s.byteCountingWriter.Current()
 }
 
-func (cs *ConnectedSocket) resetMetrics() {
-	cs.byteCountingReader.reset()
-	cs.byteCountingWriter.reset()
+func (s *Socket) resetMetrics() {
+	s.byteCountingReader.reset()
+	s.byteCountingWriter.reset()
 }

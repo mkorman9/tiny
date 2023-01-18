@@ -15,14 +15,14 @@ func init() {
 func TestFramingHandlerSimple(t *testing.T) {
 	// given
 	in := bytes.NewBuffer(generateTestPayloadWithSeparator(128))
-	socket := MockConnectedSocket(in, io.Discard)
+	socket := MockSocket(in, io.Discard)
 
 	// when
 	var receivedPackets int
 
 	PacketFramingHandler(
 		SplitBySeparator([]byte{'\n'}),
-		func(providedSocket *ConnectedSocket) PacketHandler {
+		func(providedSocket *Socket) PacketHandler {
 			// then
 			assert.Equal(t, socket, providedSocket, "sockets must match")
 
@@ -42,14 +42,14 @@ func TestFramingHandlerTwoPackets(t *testing.T) {
 		[][]byte{generateTestPayloadWithSeparator(128), generateTestPayloadWithSeparator(128)},
 		nil,
 	))
-	socket := MockConnectedSocket(in, io.Discard)
+	socket := MockSocket(in, io.Discard)
 
 	// when
 	var receivedPackets int
 
 	PacketFramingHandler(
 		SplitBySeparator([]byte{'\n'}),
-		func(providedSocket *ConnectedSocket) PacketHandler {
+		func(providedSocket *Socket) PacketHandler {
 			// then
 			assert.Equal(t, socket, providedSocket, "sockets must match")
 
@@ -66,14 +66,14 @@ func TestFramingHandlerTwoPackets(t *testing.T) {
 func TestFramingHandlerFragmentedPacket(t *testing.T) {
 	// given
 	in := bytes.NewBuffer(generateTestPayloadWithSeparator(1024))
-	socket := MockConnectedSocket(in, io.Discard)
+	socket := MockSocket(in, io.Discard)
 
 	// when
 	var receivedPackets int
 
 	PacketFramingHandler(
 		SplitBySeparator([]byte{'\n'}),
-		func(providedSocket *ConnectedSocket) PacketHandler {
+		func(providedSocket *Socket) PacketHandler {
 			// then
 			assert.Equal(t, socket, providedSocket, "sockets must match")
 
@@ -97,14 +97,14 @@ func TestFramingHandlerTwoFragmentedPackets(t *testing.T) {
 		[][]byte{generateTestPayloadWithSeparator(512), generateTestPayloadWithSeparator(512)},
 		nil,
 	))
-	socket := MockConnectedSocket(in, io.Discard)
+	socket := MockSocket(in, io.Discard)
 
 	// when
 	var receivedPackets int
 
 	PacketFramingHandler(
 		SplitBySeparator([]byte{'\n'}),
-		func(providedSocket *ConnectedSocket) PacketHandler {
+		func(providedSocket *Socket) PacketHandler {
 			// then
 			assert.Equal(t, socket, providedSocket, "sockets must match")
 
@@ -131,14 +131,14 @@ func TestFramingHandlerDelayedWriter(t *testing.T) {
 		)),
 		160, 200,
 	)
-	socket := MockConnectedSocket(in, io.Discard)
+	socket := MockSocket(in, io.Discard)
 
 	// when
 	var receivedPackets int
 
 	PacketFramingHandler(
 		SplitBySeparator([]byte{'\n'}),
-		func(providedSocket *ConnectedSocket) PacketHandler {
+		func(providedSocket *Socket) PacketHandler {
 			// then
 			assert.Equal(t, socket, providedSocket, "sockets must match")
 
@@ -155,14 +155,14 @@ func TestFramingHandlerDelayedWriter(t *testing.T) {
 func TestFramingHandlerPacketTooBig(t *testing.T) {
 	// given
 	in := bytes.NewBuffer(generateTestPayloadWithSeparator(1024))
-	socket := MockConnectedSocket(in, io.Discard)
+	socket := MockSocket(in, io.Discard)
 
 	// when
 	var receivedPackets int
 
 	PacketFramingHandler(
 		SplitBySeparator([]byte{'\n'}),
-		func(providedSocket *ConnectedSocket) PacketHandler {
+		func(providedSocket *Socket) PacketHandler {
 			// then
 			assert.Equal(t, socket, providedSocket, "sockets must match")
 

@@ -140,7 +140,7 @@ func (s *Server) Stop() {
 }
 
 // Sockets returns a list of all client sockets currently connected.
-func (s *Server) Sockets() []*ConnectedSocket {
+func (s *Server) Sockets() []*Socket {
 	return s.sockets.Copy()
 }
 

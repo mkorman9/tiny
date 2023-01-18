@@ -65,12 +65,12 @@ func mergePacketFramingConfig(provided *PacketFramingConfig) *PacketFramingConfi
 	return config
 }
 
-// PacketFramingHandler returns a ConnectedSocketHandler that handles packet framing according to given FramingProtocol.
+// PacketFramingHandler returns a SocketHandler that handles packet framing according to given FramingProtocol.
 func PacketFramingHandler(
 	framingProtocol FramingProtocol,
-	socketHandler func(socket *ConnectedSocket) PacketHandler,
+	socketHandler func(socket *Socket) PacketHandler,
 	config ...*PacketFramingConfig,
-) ConnectedSocketHandler {
+) SocketHandler {
 	var providedConfig *PacketFramingConfig
 	if config != nil {
 		providedConfig = config[0]
@@ -91,7 +91,7 @@ func PacketFramingHandler(
 		}
 	)
 
-	return func(socket *ConnectedSocket) {
+	return func(socket *Socket) {
 		packetHandler := socketHandler(socket)
 
 		var (

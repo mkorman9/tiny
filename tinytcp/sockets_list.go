@@ -19,7 +19,7 @@ type socketsList struct {
 }
 
 type socketNode struct {
-	socket *ConnectedSocket
+	socket *Socket
 	prev   *socketNode
 	next   *socketNode
 }
@@ -29,7 +29,7 @@ func newSocketsList(maxSize int) *socketsList {
 		maxSize: maxSize,
 		socketsPool: sync.Pool{
 			New: func() any {
-				return &ConnectedSocket{}
+				return &Socket{}
 			},
 		},
 		readersPool: sync.Pool{
@@ -50,7 +50,7 @@ func newSocketsList(maxSize int) *socketsList {
 	}
 }
 
-func (s *socketsList) New(connection net.Conn) *ConnectedSocket {
+func (s *socketsList) New(connection net.Conn) *Socket {
 	socket := s.newSocket(connection)
 
 	if registered := s.registerSocket(socket); !registered {
@@ -97,11 +97,11 @@ func (s *socketsList) Cleanup() {
 	}
 }
 
-func (s *socketsList) Copy() []*ConnectedSocket {
+func (s *socketsList) Copy() []*Socket {
 	s.m.RLock()
 	defer s.m.RUnlock()
 
-	var list []*ConnectedSocket
+	var list []*Socket
 	for node := s.head; node != nil; node = node.next {
 		if !node.socket.IsClosed() {
 			list = append(list, node.socket)
@@ -118,14 +118,14 @@ func (s *socketsList) ExecRead(f func(head *socketNode)) {
 	f(s.head)
 }
 
-func (s *socketsList) newSocket(connection net.Conn) *ConnectedSocket {
+func (s *socketsList) newSocket(connection net.Conn) *Socket {
 	reader := s.readersPool.Get().(*byteCountingReader)
 	reader.reader = connection
 
 	writer := s.writersPool.Get().(*byteCountingWriter)
 	writer.writer = connection
 
-	socket := s.socketsPool.Get().(*ConnectedSocket)
+	socket := s.socketsPool.Get().(*Socket)
 	socket.remoteAddress = parseRemoteAddress(connection)
 	socket.connectedAt = time.Now()
 	socket.connection = connection
@@ -137,7 +137,7 @@ func (s *socketsList) newSocket(connection net.Conn) *ConnectedSocket {
 	return socket
 }
 
-func (s *socketsList) recycleSocket(socket *ConnectedSocket) {
+func (s *socketsList) recycleSocket(socket *Socket) {
 	socket.byteCountingReader.reader = nil
 	socket.byteCountingReader.totalBytes = 0
 	socket.byteCountingReader.currentBytes = 0
@@ -152,7 +152,7 @@ func (s *socketsList) recycleSocket(socket *ConnectedSocket) {
 	s.socketsPool.Put(socket)
 }
 
-func (s *socketsList) registerSocket(socket *ConnectedSocket) bool {
+func (s *socketsList) registerSocket(socket *Socket) bool {
 	s.m.Lock()
 	defer s.m.Unlock()
 
@@ -174,7 +174,7 @@ func (s *socketsList) registerSocket(socket *ConnectedSocket) bool {
 	return true
 }
 
-func (s *socketsList) newNode(socket *ConnectedSocket) *socketNode {
+func (s *socketsList) newNode(socket *Socket) *socketNode {
 	node := s.nodesPool.Get().(*socketNode)
 	node.socket = socket
 	return node

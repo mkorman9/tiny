@@ -56,10 +56,10 @@ func (cm *ConnMock) SetWriteDeadline(_ time.Time) error {
 	return nil
 }
 
-// ConnectedSocket
+// Socket
 
-func MockConnectedSocket(in io.Reader, out io.Writer) *ConnectedSocket {
-	return &ConnectedSocket{
+func MockSocket(in io.Reader, out io.Writer) *Socket {
+	return &Socket{
 		remoteAddress: "127.0.0.1",
 		connectedAt:   time.Now(),
 		connection:    &ConnMock{},
