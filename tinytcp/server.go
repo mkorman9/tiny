@@ -141,18 +141,6 @@ func (s *Server) startServer() error {
 	s.listenerMutex.Lock()
 	defer s.listenerMutex.Unlock()
 
-	err := s.startListener()
-	if err != nil {
-		return err
-	}
-
-	go s.startBackgroundJob()
-	s.forkingStrategy.OnStart()
-
-	return nil
-}
-
-func (s *Server) startListener() error {
 	if s.config.TLSCert != "" && s.config.TLSKey != "" {
 		cert, err := tls.LoadX509KeyPair(s.config.TLSCert, s.config.TLSKey)
 		if err != nil {
@@ -175,6 +163,9 @@ func (s *Server) startListener() error {
 
 		s.listener = socket
 	}
+
+	go s.startBackgroundJob()
+	s.forkingStrategy.OnStart()
 
 	return nil
 }
