@@ -167,6 +167,7 @@ func (s *socketsList) registerSocket(socket *Socket) bool {
 	} else {
 		s.tail.next = node
 		node.prev = s.tail
+		s.tail = node
 	}
 
 	s.size++
