@@ -138,6 +138,9 @@ func (s *Server) OnMetricsUpdate(handler func()) {
 }
 
 func (s *Server) startServer() error {
+	s.listenerMutex.Lock()
+	defer s.listenerMutex.Unlock()
+
 	err := s.startListener()
 	if err != nil {
 		return err
@@ -150,9 +153,6 @@ func (s *Server) startServer() error {
 }
 
 func (s *Server) startListener() error {
-	s.listenerMutex.Lock()
-	defer s.listenerMutex.Unlock()
-	
 	if s.config.TLSCert != "" && s.config.TLSKey != "" {
 		cert, err := tls.LoadX509KeyPair(s.config.TLSCert, s.config.TLSKey)
 		if err != nil {
