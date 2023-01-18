@@ -29,7 +29,7 @@ func SetupLogger(config ...*Config) {
 // SetLevel sets global log level.
 func SetLevel(level string) error {
 	levelValue, err := zerolog.ParseLevel(level)
-	if err == nil {
+	if err != nil {
 		return err
 	}
 

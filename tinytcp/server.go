@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/rs/zerolog/log"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -14,10 +15,12 @@ type Server struct {
 	config               *ServerConfig
 	address              string
 	listener             net.Listener
+	listenerMutex        sync.RWMutex
 	errorChannel         chan error
 	forkingStrategy      ForkingStrategy
 	sockets              *socketsList
 	ticker               *time.Ticker
+	abortOnce            sync.Once
 	jobRestarts          int
 	metrics              ServerMetrics
 	metricsUpdateHandler func()
@@ -46,6 +49,13 @@ func (s *Server) ForkingStrategy(forkingStrategy ForkingStrategy) {
 
 // Port returns a port number used by underlying listener. Only returns a valid value after Start().
 func (s *Server) Port() int {
+	s.listenerMutex.RLock()
+	defer s.listenerMutex.RUnlock()
+
+	if s.listener == nil {
+		return -1
+	}
+
 	return resolveListenerPort(s.listener)
 }
 
@@ -59,6 +69,75 @@ func (s *Server) Start() error {
 		return errors.New("empty forking strategy")
 	}
 
+	err := s.startServer()
+	if err != nil {
+		return err
+	}
+
+	log.Info().Msgf("TCP server started (%s)", s.address)
+
+	return s.acceptLoop()
+}
+
+// Stop implements the interface of tiny.Service.
+func (s *Server) Stop() {
+	s.listenerMutex.Lock()
+	defer s.listenerMutex.Unlock()
+
+	if s.listener == nil {
+		return
+	}
+
+	if err := s.listener.Close(); err != nil {
+		if !isBrokenPipe(err) {
+			log.Error().Err(err).Msgf("Error shutting down TCP server (%s)", s.address)
+		}
+	}
+	s.listener = nil
+
+	if s.ticker != nil {
+		s.ticker.Stop()
+	}
+
+	sockets := s.Sockets()
+	for _, socket := range sockets {
+		_ = socket.Close()
+	}
+	s.sockets.Cleanup()
+
+	s.forkingStrategy.OnStop()
+
+	log.Info().Msgf("TCP server stopped (%s)", s.address)
+}
+
+// Abort immediately stops the server with error.
+func (s *Server) Abort(err error) {
+	s.abortOnce.Do(func() {
+		select {
+		case s.errorChannel <- err:
+		default:
+		}
+
+		s.Stop()
+	})
+}
+
+// Sockets returns a list of all client sockets currently connected.
+func (s *Server) Sockets() []*Socket {
+	return s.sockets.Copy()
+}
+
+// Metrics returns aggregated server metrics.
+func (s *Server) Metrics() ServerMetrics {
+	return s.metrics
+}
+
+// OnMetricsUpdate sets a handler that is called everytime the server metrics are updated.
+func (s *Server) OnMetricsUpdate(handler func()) {
+	s.metricsUpdateHandler = handler
+}
+
+func (s *Server) startServer() error {
 	err := s.startListener()
 	if err != nil {
 		return err
@@ -67,12 +146,13 @@ func (s *Server) Start() error {
 	go s.startBackgroundJob()
 	s.forkingStrategy.OnStart()
 
-	log.Info().Msgf("TCP server started (%s)", s.address)
-
-	return s.acceptLoop()
+	return nil
 }
 
 func (s *Server) startListener() error {
+	s.listenerMutex.Lock()
+	defer s.listenerMutex.Unlock()
+	
 	if s.config.TLSCert != "" && s.config.TLSKey != "" {
 		cert, err := tls.LoadX509KeyPair(s.config.TLSCert, s.config.TLSKey)
 		if err != nil {
@@ -124,58 +204,6 @@ func (s *Server) acceptLoop() error {
 	}
 
 	return err
-}
-
-// Stop implements the interface of tiny.Service.
-func (s *Server) Stop() {
-	if s.listener == nil {
-		return
-	}
-
-	if err := s.listener.Close(); err != nil {
-		if !isBrokenPipe(err) {
-			log.Error().Err(err).Msgf("Error shutting down TCP server (%s)", s.address)
-		}
-	}
-	s.listener = nil
-
-	if s.ticker != nil {
-		s.ticker.Stop()
-	}
-
-	sockets := s.Sockets()
-	for _, socket := range sockets {
-		_ = socket.Close()
-	}
-
-	s.forkingStrategy.OnStop()
-
-	log.Info().Msgf("TCP server stopped (%s)", s.address)
-}
-
-// Abort immediately stops the server with error.
-func (s *Server) Abort(err error) {
-	select {
-	case s.errorChannel <- err:
-	default:
-	}
-
-	s.Stop()
-}
-
-// Sockets returns a list of all client sockets currently connected.
-func (s *Server) Sockets() []*Socket {
-	return s.sockets.Copy()
-}
-
-// Metrics returns aggregated server metrics.
-func (s *Server) Metrics() ServerMetrics {
-	return s.metrics
-}
-
-// OnMetricsUpdate sets a handler that is called everytime the server metrics are updated.
-func (s *Server) OnMetricsUpdate(handler func()) {
-	s.metricsUpdateHandler = handler
 }
 
 func (s *Server) handleNewConnection(connection net.Conn) {
