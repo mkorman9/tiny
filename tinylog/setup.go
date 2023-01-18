@@ -26,13 +26,23 @@ func SetupLogger(config ...*Config) {
 	configureFields(c)
 }
 
-func configureSettings(config *Config) {
-	level, err := zerolog.ParseLevel(config.Level)
+// SetLevel sets global log level.
+func SetLevel(level string) error {
+	levelValue, err := zerolog.ParseLevel(level)
 	if err == nil {
-		level = zerolog.InfoLevel
+		return err
 	}
 
-	zerolog.SetGlobalLevel(level)
+	zerolog.SetGlobalLevel(levelValue)
+
+	return nil
+}
+
+func configureSettings(config *Config) {
+	if err := SetLevel(config.Level); err != nil {
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	}
+
 	zerolog.TimestampFunc = func() time.Time {
 		return time.Now().UTC()
 	}
