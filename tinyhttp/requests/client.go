@@ -20,28 +20,23 @@ var (
 
 // Client is an HTTP client, capable of executing HTTP requests and performing retries.
 type Client struct {
-	config     *ClientConfig
+	config     *Config
 	httpClient *http.Client
 }
 
 // NewClient creates an instance of Client using given options.
-func NewClient(opts ...ClientOpt) *Client {
-	config := &ClientConfig{
-		Network:      "tcp",
-		Timeout:      10 * time.Second,
-		MaxRedirects: 10,
-		TLSConfig:    &tls.Config{},
+func NewClient(config ...*Config) *Client {
+	var providedConfig *Config
+	if config != nil {
+		providedConfig = config[0]
 	}
-
-	for _, opt := range opts {
-		opt(config)
-	}
+	c := mergeConfig(providedConfig)
 
 	httpClient := &http.Client{
-		Timeout: config.Timeout,
-		Jar:     config.CookieJar,
+		Timeout: c.Timeout,
+		Jar:     c.CookieJar,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= config.MaxRedirects {
+			if len(via) >= c.MaxRedirects {
 				return ErrRedirect
 			} else {
 				return nil
@@ -49,29 +44,29 @@ func NewClient(opts ...ClientOpt) *Client {
 		},
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				if config.Address != "" {
-					addr = config.Address
+				if c.Address != "" {
+					addr = c.Address
 				}
 
 				d := net.Dialer{}
-				return d.DialContext(ctx, config.Network, addr)
+				return d.DialContext(ctx, c.Network, addr)
 			},
 			DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				if config.Address != "" {
-					addr = config.Address
+				if c.Address != "" {
+					addr = c.Address
 				}
 
 				d := tls.Dialer{
-					Config: config.TLSConfig,
+					Config: c.TLSConfig,
 				}
-				return d.DialContext(ctx, config.Network, addr)
+				return d.DialContext(ctx, c.Network, addr)
 			},
-			TLSClientConfig: config.TLSConfig,
+			TLSClientConfig: c.TLSConfig,
 		},
 	}
 
 	return &Client{
-		config:     config,
+		config:     c,
 		httpClient: httpClient,
 	}
 }
