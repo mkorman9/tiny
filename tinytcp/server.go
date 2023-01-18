@@ -6,33 +6,19 @@ import (
 	"fmt"
 	"github.com/rs/zerolog/log"
 	"net"
-	"sync"
 	"time"
 )
 
 // Server represents a TCP server, and conforms to the tiny.Service interface.
 type Server struct {
-	config                 *ServerConfig
-	address                string
-	listener               net.Listener
-	forkingStrategy        ForkingStrategy
-	socketsListHead        *connectedSocketNode
-	socketsListTail        *connectedSocketNode
-	socketsCount           int
-	socketsMutex           sync.RWMutex
-	ticker                 *time.Ticker
-	metrics                ServerMetrics
-	metricsUpdateHandler   func()
-	connectedSocketPool    sync.Pool
-	byteCountingReaderPool sync.Pool
-	byteCountingWriterPool sync.Pool
-	socketNodesPool        sync.Pool
-}
-
-type connectedSocketNode struct {
-	socket *ConnectedSocket
-	prev   *connectedSocketNode
-	next   *connectedSocketNode
+	config               *ServerConfig
+	address              string
+	listener             net.Listener
+	forkingStrategy      ForkingStrategy
+	sockets              *socketsList
+	ticker               *time.Ticker
+	metrics              ServerMetrics
+	metricsUpdateHandler func()
 }
 
 // NewServer returns new Server instance.
@@ -46,26 +32,7 @@ func NewServer(address string, config ...*ServerConfig) *Server {
 	return &Server{
 		config:  c,
 		address: address,
-		connectedSocketPool: sync.Pool{
-			New: func() any {
-				return &ConnectedSocket{}
-			},
-		},
-		byteCountingReaderPool: sync.Pool{
-			New: func() any {
-				return &byteCountingReader{}
-			},
-		},
-		byteCountingWriterPool: sync.Pool{
-			New: func() any {
-				return &byteCountingWriter{}
-			},
-		},
-		socketNodesPool: sync.Pool{
-			New: func() any {
-				return &connectedSocketNode{}
-			},
-		},
+		sockets: newSocketsList(c.MaxClients),
 	}
 }
 
@@ -174,17 +141,7 @@ func (s *Server) Stop() {
 
 // Sockets returns a list of all client sockets currently connected.
 func (s *Server) Sockets() []*ConnectedSocket {
-	s.socketsMutex.RLock()
-	defer s.socketsMutex.RUnlock()
-
-	var list []*ConnectedSocket
-	for node := s.socketsListHead; node != nil; node = node.next {
-		if !node.socket.IsClosed() {
-			list = append(list, node.socket)
-		}
-	}
-
-	return list
+	return s.sockets.Copy()
 }
 
 // Metrics returns aggregated server metrics.
@@ -198,59 +155,14 @@ func (s *Server) OnMetricsUpdate(handler func()) {
 }
 
 func (s *Server) handleNewConnection(connection net.Conn) {
-	socket := s.newConnectedSocket(connection)
-
-	if registered := s.registerConnectedSocket(socket); !registered {
-		// instantly terminate the connection if it can't be added to the server pool
-		_ = socket.connection.Close()
-		s.recycleConnectedSocket(socket)
+	socket := s.sockets.New(connection)
+	if socket == nil {
 		return
 	}
 
 	log.Debug().Msgf("Opening TCP client connection: %s", socket.connection.RemoteAddr().String())
 
 	s.forkingStrategy.OnAccept(socket)
-}
-
-func (s *Server) newConnectedSocket(connection net.Conn) *ConnectedSocket {
-	reader := s.byteCountingReaderPool.Get().(*byteCountingReader)
-	reader.reader = connection
-
-	writer := s.byteCountingWriterPool.Get().(*byteCountingWriter)
-	writer.writer = connection
-
-	cs := s.connectedSocketPool.Get().(*ConnectedSocket)
-	cs.remoteAddress = parseRemoteAddress(connection)
-	cs.connectedAt = time.Now()
-	cs.connection = connection
-	cs.reader = reader
-	cs.writer = writer
-	cs.byteCountingReader = reader
-	cs.byteCountingWriter = writer
-	return cs
-}
-
-func (s *Server) registerConnectedSocket(socket *ConnectedSocket) bool {
-	s.socketsMutex.Lock()
-	defer s.socketsMutex.Unlock()
-
-	if s.config.MaxClients >= 0 && s.socketsCount >= s.config.MaxClients {
-		return false
-	}
-
-	node := s.socketNodesPool.Get().(*connectedSocketNode)
-	node.socket = socket
-
-	if s.socketsListHead == nil {
-		s.socketsListHead = node
-		s.socketsListTail = node
-	} else {
-		s.socketsListTail.next = node
-		node.prev = s.socketsListTail
-	}
-
-	s.socketsCount++
-	return true
 }
 
 func (s *Server) startBackgroundJob() {
@@ -269,88 +181,38 @@ func (s *Server) startBackgroundJob() {
 		select {
 		case <-s.ticker.C:
 			s.updateMetrics()
-			s.cleanupConnectedSockets()
+			s.sockets.Cleanup()
 		}
 	}
 }
 
 func (s *Server) updateMetrics() {
-	s.socketsMutex.RLock()
-	defer s.socketsMutex.RUnlock()
-
-	s.metrics.Connections = s.socketsCount
-
-	s.metrics.ReadsPerSecond = 0
-	s.metrics.WritesPerSecond = 0
-	if s.metrics.Connections > s.metrics.MaxConnections {
-		s.metrics.MaxConnections = s.metrics.Connections
-	}
-	s.forkingStrategy.OnMetricsUpdate(&s.metrics)
-
-	for node := s.socketsListHead; node != nil; node = node.next {
-		reads := node.socket.ReadsPerSecond()
-		writes := node.socket.WritesPerSecond()
-
-		s.metrics.TotalRead += reads
-		s.metrics.TotalWritten += writes
-		s.metrics.ReadsPerSecond += reads
-		s.metrics.WritesPerSecond += writes
-	}
-
-	if s.metricsUpdateHandler != nil {
-		s.metricsUpdateHandler()
-	}
-
-	for node := s.socketsListHead; node != nil; node = node.next {
-		node.socket.resetMetrics()
-	}
-}
-
-func (s *Server) cleanupConnectedSockets() {
-	s.socketsMutex.Lock()
-	defer s.socketsMutex.Unlock()
-
-	var node = s.socketsListHead
-	for node != nil {
-		socket := node.socket
-		next := node.next
-
-		if socket.IsClosed() {
-			switch node {
-			case s.socketsListHead:
-				s.socketsListHead = node.next
-			case s.socketsListTail:
-				s.socketsListTail = node.prev
-				s.socketsListTail.next = nil
-			default:
-				node.prev.next = node.next
-				node.next.prev = node.prev
-			}
-
-			node.socket = nil
-			node.next = nil
-			node.prev = nil
-			s.socketNodesPool.Put(node)
-
-			s.recycleConnectedSocket(socket)
-			s.socketsCount--
+	s.sockets.ExecRead(func(head *socketNode) {
+		s.metrics.Connections = s.sockets.Len()
+		s.metrics.ReadsPerSecond = 0
+		s.metrics.WritesPerSecond = 0
+		if s.metrics.Connections > s.metrics.MaxConnections {
+			s.metrics.MaxConnections = s.metrics.Connections
 		}
 
-		node = next
-	}
-}
+		s.forkingStrategy.OnMetricsUpdate(&s.metrics)
 
-func (s *Server) recycleConnectedSocket(socket *ConnectedSocket) {
-	socket.byteCountingReader.reader = nil
-	socket.byteCountingReader.totalBytes = 0
-	socket.byteCountingReader.currentBytes = 0
-	s.byteCountingReaderPool.Put(socket.byteCountingReader)
+		for node := head; node != nil; node = node.next {
+			reads := node.socket.ReadsPerSecond()
+			writes := node.socket.WritesPerSecond()
 
-	socket.byteCountingWriter.writer = nil
-	socket.byteCountingWriter.totalBytes = 0
-	socket.byteCountingWriter.currentBytes = 0
-	s.byteCountingWriterPool.Put(socket.byteCountingWriter)
+			s.metrics.TotalRead += reads
+			s.metrics.TotalWritten += writes
+			s.metrics.ReadsPerSecond += reads
+			s.metrics.WritesPerSecond += writes
+		}
 
-	socket.reset()
-	s.connectedSocketPool.Put(socket)
+		if s.metricsUpdateHandler != nil {
+			s.metricsUpdateHandler()
+		}
+
+		for node := head; node != nil; node = node.next {
+			node.socket.resetMetrics()
+		}
+	})
 }
