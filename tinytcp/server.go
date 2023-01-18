@@ -41,6 +41,18 @@ func NewServer(address string, config ...*ServerConfig) *Server {
 	}
 }
 
+// Abort immediately stops the server with error.
+func (s *Server) Abort(err error) {
+	s.abortOnce.Do(func() {
+		select {
+		case s.errorChannel <- err:
+		default:
+		}
+
+		s.Stop()
+	})
+}
+
 // ForkingStrategy sets forking strategy used by this server (see ForkingStrategy).
 func (s *Server) ForkingStrategy(forkingStrategy ForkingStrategy) {
 	s.forkingStrategy = forkingStrategy
@@ -56,6 +68,21 @@ func (s *Server) Port() int {
 	}
 
 	return resolveListenerPort(s.listener)
+}
+
+// Sockets returns a list of all client sockets currently connected.
+func (s *Server) Sockets() []*Socket {
+	return s.sockets.Copy()
+}
+
+// Metrics returns aggregated server metrics.
+func (s *Server) Metrics() ServerMetrics {
+	return s.metrics
+}
+
+// OnMetricsUpdate sets a handler that is called everytime the server metrics are updated.
+func (s *Server) OnMetricsUpdate(handler func()) {
+	s.metricsUpdateHandler = handler
 }
 
 // Start implements the interface of tiny.Service.
@@ -107,33 +134,6 @@ func (s *Server) Stop() {
 	s.forkingStrategy.OnStop()
 
 	log.Info().Msgf("TCP server stopped (%s)", s.address)
-}
-
-// Abort immediately stops the server with error.
-func (s *Server) Abort(err error) {
-	s.abortOnce.Do(func() {
-		select {
-		case s.errorChannel <- err:
-		default:
-		}
-
-		s.Stop()
-	})
-}
-
-// Sockets returns a list of all client sockets currently connected.
-func (s *Server) Sockets() []*Socket {
-	return s.sockets.Copy()
-}
-
-// Metrics returns aggregated server metrics.
-func (s *Server) Metrics() ServerMetrics {
-	return s.metrics
-}
-
-// OnMetricsUpdate sets a handler that is called everytime the server metrics are updated.
-func (s *Server) OnMetricsUpdate(handler func()) {
-	s.metricsUpdateHandler = handler
 }
 
 func (s *Server) startServer() error {
