@@ -97,8 +97,8 @@ func (m *Middleware) authorize(
 	return func(c *fiber.Ctx) error {
 		verificationResult, err := action(c)
 		if err != nil {
-			if config.errorHandler != nil {
-				return config.errorHandler(c, err)
+			if config.OnError != nil {
+				return config.OnError(c, err)
 			}
 
 			c.Status(fiber.StatusInternalServerError)
@@ -106,8 +106,8 @@ func (m *Middleware) authorize(
 		}
 
 		if !verificationResult.Verified {
-			if config.unverifiedHandler != nil {
-				return config.unverifiedHandler(c)
+			if config.OnUnverified != nil {
+				return config.OnUnverified(c, verificationResult)
 			}
 
 			c.Status(fiber.StatusUnauthorized)
@@ -116,8 +116,8 @@ func (m *Middleware) authorize(
 
 		rolesCheckingResult := checkRoles(verificationResult.Roles)
 		if !rolesCheckingResult {
-			if config.accessDeniedHandler != nil {
-				return config.accessDeniedHandler(c)
+			if config.OnAccessDenied != nil {
+				return config.OnAccessDenied(c, verificationResult)
 			}
 
 			c.Status(fiber.StatusForbidden)

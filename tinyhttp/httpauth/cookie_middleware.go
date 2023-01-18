@@ -10,10 +10,10 @@ type VerifyCookieFunc = func(c *fiber.Ctx, cookie string) (*VerificationResult, 
 
 // NewSessionCookieMiddleware creates new cookie-based Middleware.
 // This middleware reads a cookie specified by cookieName argument and calls verifyCookie with its value.
-func NewSessionCookieMiddleware(cookieName string, verifyCookie VerifyCookieFunc, opts ...MiddlewareOpt) *Middleware {
-	config := MiddlewareConfig{}
-	for _, opt := range opts {
-		opt(&config)
+func NewSessionCookieMiddleware(cookieName string, verifyCookie VerifyCookieFunc, config ...*MiddlewareConfig) *Middleware {
+	c := &MiddlewareConfig{}
+	if config != nil {
+		c = config[0]
 	}
 
 	return newMiddleware(
@@ -21,7 +21,7 @@ func NewSessionCookieMiddleware(cookieName string, verifyCookie VerifyCookieFunc
 			cookie := extractCookie(c, cookieName)
 			return verifyCookie(c, cookie)
 		},
-		&config,
+		c,
 	)
 }
 

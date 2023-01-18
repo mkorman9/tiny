@@ -10,10 +10,10 @@ type VerifyTokenFunc = func(c *fiber.Ctx, token string) (*VerificationResult, er
 
 // NewBearerTokenMiddleware creates new bearer-token based Middleware.
 // This middleware reads Authorization header and expects it to begin with "Bearer" string.
-func NewBearerTokenMiddleware(verifyToken VerifyTokenFunc, opts ...MiddlewareOpt) *Middleware {
-	config := MiddlewareConfig{}
-	for _, opt := range opts {
-		opt(&config)
+func NewBearerTokenMiddleware(verifyToken VerifyTokenFunc, config ...*MiddlewareConfig) *Middleware {
+	c := &MiddlewareConfig{}
+	if config != nil {
+		c = config[0]
 	}
 
 	return newMiddleware(
@@ -21,7 +21,7 @@ func NewBearerTokenMiddleware(verifyToken VerifyTokenFunc, opts ...MiddlewareOpt
 			token := extractToken(c)
 			return verifyToken(c, token)
 		},
-		&config,
+		c,
 	)
 }
 
