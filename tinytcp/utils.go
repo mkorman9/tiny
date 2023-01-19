@@ -39,6 +39,11 @@ const (
 	PrefixInt64_LE
 )
 
+const (
+	segmentBits = 0x7F
+	continueBit = 0x80
+)
+
 func isBrokenPipe(err error) bool {
 	return err == io.EOF ||
 		errors.Is(err, syscall.ECONNRESET) ||
