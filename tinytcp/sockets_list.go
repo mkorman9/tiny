@@ -3,7 +3,6 @@ package tinytcp
 import (
 	"net"
 	"sync"
-	"time"
 )
 
 type socketsList struct {
@@ -21,8 +20,8 @@ func newSocketsList(maxSize int) *socketsList {
 		pool: sync.Pool{
 			New: func() any {
 				return &Socket{
-					byteCountingReader: &byteCountingReader{},
-					byteCountingWriter: &byteCountingWriter{},
+					meteredReader: &meteredReader{},
+					meteredWriter: &meteredWriter{},
 				}
 			},
 		},
@@ -97,14 +96,7 @@ func (s *socketsList) ExecRead(f func(head *Socket)) {
 
 func (s *socketsList) newSocket(connection net.Conn) *Socket {
 	socket := s.pool.Get().(*Socket)
-	socket.remoteAddress = parseRemoteAddress(connection)
-	socket.connectedAt = time.Now()
-	socket.connection = connection
-	socket.byteCountingReader.reader = connection
-	socket.byteCountingWriter.writer = connection
-	socket.reader = socket.byteCountingReader
-	socket.writer = socket.byteCountingWriter
-
+	socket.init(connection)
 	return socket
 }
 

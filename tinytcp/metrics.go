@@ -20,7 +20,7 @@ type ServerMetrics struct {
 	// ReadsPerSecond is total number of bytes written by server last second.
 	WritesPerSecond uint64
 
-	// Connections is total number of clients connected during last second.
+	// Connections denotes a total number of clients connected during last second.
 	Connections int
 
 	// MaxConnections is maximum number of clients connected at a single time.
@@ -33,14 +33,14 @@ type ServerMetrics struct {
 	MaxGoroutines int
 }
 
-type byteCountingReader struct {
+type meteredReader struct {
 	reader  io.Reader
 	total   uint64
 	current uint64
 	rate    uint64
 }
 
-func (r *byteCountingReader) Read(b []byte) (int, error) {
+func (r *meteredReader) Read(b []byte) (int, error) {
 	n, err := r.reader.Read(b)
 
 	if n > 0 {
@@ -50,15 +50,15 @@ func (r *byteCountingReader) Read(b []byte) (int, error) {
 	return n, err
 }
 
-func (r *byteCountingReader) Total() uint64 {
+func (r *meteredReader) Total() uint64 {
 	return atomic.LoadUint64(&r.total)
 }
 
-func (r *byteCountingReader) PerSecond() uint64 {
+func (r *meteredReader) PerSecond() uint64 {
 	return atomic.LoadUint64(&r.rate)
 }
 
-func (r *byteCountingReader) update(interval time.Duration) uint64 {
+func (r *meteredReader) update(interval time.Duration) uint64 {
 	current := atomic.SwapUint64(&r.current, 0)
 
 	atomic.StoreUint64(&r.rate, uint64(float64(current)/interval.Seconds()))
@@ -67,21 +67,21 @@ func (r *byteCountingReader) update(interval time.Duration) uint64 {
 	return current
 }
 
-func (r *byteCountingReader) reset() {
+func (r *meteredReader) reset() {
 	r.reader = nil
 	r.total = 0
 	r.current = 0
 	r.rate = 0
 }
 
-type byteCountingWriter struct {
+type meteredWriter struct {
 	writer  io.Writer
 	total   uint64
 	current uint64
 	rate    uint64
 }
 
-func (w *byteCountingWriter) Write(b []byte) (int, error) {
+func (w *meteredWriter) Write(b []byte) (int, error) {
 	n, err := w.writer.Write(b)
 
 	if n > 0 {
@@ -91,15 +91,15 @@ func (w *byteCountingWriter) Write(b []byte) (int, error) {
 	return n, err
 }
 
-func (w *byteCountingWriter) Total() uint64 {
+func (w *meteredWriter) Total() uint64 {
 	return atomic.LoadUint64(&w.total)
 }
 
-func (w *byteCountingWriter) PerSecond() uint64 {
+func (w *meteredWriter) PerSecond() uint64 {
 	return atomic.LoadUint64(&w.rate)
 }
 
-func (w *byteCountingWriter) update(interval time.Duration) uint64 {
+func (w *meteredWriter) update(interval time.Duration) uint64 {
 	current := atomic.SwapUint64(&w.current, 0)
 
 	atomic.StoreUint64(&w.rate, uint64(float64(current)/interval.Seconds()))
@@ -108,7 +108,7 @@ func (w *byteCountingWriter) update(interval time.Duration) uint64 {
 	return current
 }
 
-func (w *byteCountingWriter) reset() {
+func (w *meteredWriter) reset() {
 	w.writer = nil
 	w.total = 0
 	w.current = 0

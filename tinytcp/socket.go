@@ -17,8 +17,8 @@ type Socket struct {
 	connection         net.Conn
 	reader             io.Reader
 	writer             io.Writer
-	byteCountingReader *byteCountingReader
-	byteCountingWriter *byteCountingWriter
+	meteredReader      *meteredReader
+	meteredWriter      *meteredWriter
 	isClosed           uint32
 	closeOnce          sync.Once
 	closeHandlers      []SocketCloseHandler
@@ -33,20 +33,6 @@ type SocketHandler func(*Socket)
 
 // SocketCloseHandler represents a signature of function used by Socket to register custom close handlers.
 type SocketCloseHandler func(CloseReason)
-
-func (s *Socket) reset() {
-	s.remoteAddress = ""
-	s.connection = nil
-	s.byteCountingReader.reset()
-	s.byteCountingWriter.reset()
-	s.isClosed = 0
-	s.closeOnce = sync.Once{}
-	s.closeHandlers = nil
-	s.closeHandlersMutex = sync.RWMutex{}
-
-	s.prev = nil
-	s.next = nil
-}
 
 // RemoteAddress returns a remote address of the socket.
 func (s *Socket) RemoteAddress() string {
@@ -152,7 +138,10 @@ func (s *Socket) SetReadDeadline(deadline time.Time) error {
 		} else {
 			log.Error().
 				Err(err).
-				Msgf("Error while setting read deadline for TCP client connection: %s", s.connection.RemoteAddr().String())
+				Msgf(
+					"Error while setting read deadline for TCP client connection: %s",
+					s.connection.RemoteAddr().String(),
+				)
 		}
 
 		return err
@@ -174,7 +163,10 @@ func (s *Socket) SetWriteDeadline(deadline time.Time) error {
 		} else {
 			log.Error().
 				Err(err).
-				Msgf("Error while setting write deadline for TCP client connection: %s", s.connection.RemoteAddr().String())
+				Msgf(
+					"Error while setting write deadline for TCP client connection: %s",
+					s.connection.RemoteAddr().String(),
+				)
 		}
 
 		return err
@@ -217,26 +209,50 @@ func (s *Socket) WrapWriter(wrapper func(io.Writer) io.Writer) {
 
 // TotalRead returns a total number of bytes read through this socket.
 func (s *Socket) TotalRead() uint64 {
-	return s.byteCountingReader.Total()
+	return s.meteredReader.Total()
 }
 
 // ReadsPerSecond returns a total number of bytes read through socket this second.
 func (s *Socket) ReadsPerSecond() uint64 {
-	return s.byteCountingReader.PerSecond()
+	return s.meteredReader.PerSecond()
 }
 
 // TotalWritten returns a total number of bytes written through this socket.
 func (s *Socket) TotalWritten() uint64 {
-	return s.byteCountingWriter.Total()
+	return s.meteredWriter.Total()
 }
 
 // WritesPerSecond returns a total number of bytes written through socket this second.
 func (s *Socket) WritesPerSecond() uint64 {
-	return s.byteCountingWriter.PerSecond()
+	return s.meteredWriter.PerSecond()
+}
+
+func (s *Socket) init(conn net.Conn) {
+	s.remoteAddress = parseRemoteAddress(conn)
+	s.connectedAt = time.Now()
+	s.connection = conn
+	s.meteredReader.reader = conn
+	s.meteredWriter.writer = conn
+	s.reader = s.meteredReader
+	s.writer = s.meteredWriter
+}
+
+func (s *Socket) reset() {
+	s.remoteAddress = ""
+	s.connection = nil
+	s.meteredReader.reset()
+	s.meteredWriter.reset()
+	s.isClosed = 0
+	s.closeOnce = sync.Once{}
+	s.closeHandlers = nil
+	s.closeHandlersMutex = sync.RWMutex{}
+
+	s.prev = nil
+	s.next = nil
 }
 
 func (s *Socket) updateMetrics(interval time.Duration) (uint64, uint64) {
-	reads := s.byteCountingReader.update(interval)
-	writes := s.byteCountingWriter.update(interval)
+	reads := s.meteredReader.update(interval)
+	writes := s.meteredWriter.update(interval)
 	return reads, writes
 }
