@@ -233,7 +233,7 @@ func (s *Server) startBackgroundJob() {
 }
 
 func (s *Server) updateMetrics() {
-	s.sockets.ExecRead(func(head *socketNode) {
+	s.sockets.ExecRead(func(head *Socket) {
 		s.metrics.Connections = s.sockets.Len()
 		s.metrics.ReadsPerSecond = 0
 		s.metrics.WritesPerSecond = 0
@@ -243,9 +243,9 @@ func (s *Server) updateMetrics() {
 
 		s.forkingStrategy.OnMetricsUpdate(&s.metrics)
 
-		for node := head; node != nil; node = node.next {
-			reads := node.socket.ReadsPerSecond()
-			writes := node.socket.WritesPerSecond()
+		for socket := head; socket != nil; socket = socket.next {
+			reads := socket.ReadsPerSecond()
+			writes := socket.WritesPerSecond()
 
 			s.metrics.TotalRead += reads
 			s.metrics.TotalWritten += writes
@@ -257,8 +257,8 @@ func (s *Server) updateMetrics() {
 			s.metricsUpdateHandler()
 		}
 
-		for node := head; node != nil; node = node.next {
-			node.socket.resetMetrics()
+		for socket := head; socket != nil; socket = socket.next {
+			socket.resetMetrics()
 		}
 	})
 }

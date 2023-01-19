@@ -23,6 +23,9 @@ type Socket struct {
 	closeOnce          sync.Once
 	closeHandlers      []func()
 	closeHandlersMutex sync.RWMutex
+
+	prev *Socket
+	next *Socket
 }
 
 // SocketHandler represents a signature of function used by Server to handle new connections.
@@ -39,6 +42,9 @@ func (s *Socket) reset() {
 	s.closeOnce = sync.Once{}
 	s.closeHandlers = nil
 	s.closeHandlersMutex = sync.RWMutex{}
+
+	s.prev = nil
+	s.next = nil
 }
 
 // RemoteAddress returns a remote address of the socket.

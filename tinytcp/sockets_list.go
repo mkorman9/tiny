@@ -7,8 +7,8 @@ import (
 )
 
 type socketsList struct {
-	head        *socketNode
-	tail        *socketNode
+	head        *Socket
+	tail        *Socket
 	size        int
 	maxSize     int
 	m           sync.RWMutex
@@ -16,12 +16,6 @@ type socketsList struct {
 	readersPool sync.Pool
 	writersPool sync.Pool
 	nodesPool   sync.Pool
-}
-
-type socketNode struct {
-	socket *Socket
-	prev   *socketNode
-	next   *socketNode
 }
 
 func newSocketsList(maxSize int) *socketsList {
@@ -40,11 +34,6 @@ func newSocketsList(maxSize int) *socketsList {
 		writersPool: sync.Pool{
 			New: func() any {
 				return &byteCountingWriter{}
-			},
-		},
-		nodesPool: sync.Pool{
-			New: func() any {
-				return &socketNode{}
 			},
 		},
 	}
@@ -71,29 +60,27 @@ func (s *socketsList) Cleanup() {
 	s.m.Lock()
 	defer s.m.Unlock()
 
-	var node = s.head
-	for node != nil {
-		socket := node.socket
-		next := node.next
+	var socket = s.head
+	for socket != nil {
+		next := socket.next
 
 		if socket.IsClosed() {
-			switch node {
+			switch socket {
 			case s.head:
-				s.head = node.next
+				s.head = socket.next
 			case s.tail:
-				s.tail = node.prev
+				s.tail = socket.prev
 				s.tail.next = nil
 			default:
-				node.prev.next = node.next
-				node.next.prev = node.prev
+				socket.prev.next = socket.next
+				socket.next.prev = socket.prev
 			}
 
-			s.recycleNode(node)
 			s.recycleSocket(socket)
 			s.size--
 		}
 
-		node = next
+		socket = next
 	}
 }
 
@@ -102,16 +89,16 @@ func (s *socketsList) Copy() []*Socket {
 	defer s.m.RUnlock()
 
 	var list []*Socket
-	for node := s.head; node != nil; node = node.next {
-		if !node.socket.IsClosed() {
-			list = append(list, node.socket)
+	for socket := s.head; socket != nil; socket = socket.next {
+		if !socket.IsClosed() {
+			list = append(list, socket)
 		}
 	}
 
 	return list
 }
 
-func (s *socketsList) ExecRead(f func(head *socketNode)) {
+func (s *socketsList) ExecRead(f func(head *Socket)) {
 	s.m.RLock()
 	defer s.m.RUnlock()
 
@@ -137,6 +124,28 @@ func (s *socketsList) newSocket(connection net.Conn) *Socket {
 	return socket
 }
 
+func (s *socketsList) registerSocket(socket *Socket) bool {
+	s.m.Lock()
+	defer s.m.Unlock()
+
+	if s.maxSize >= 0 && s.size >= s.maxSize {
+		return false
+	}
+
+	if s.head == nil {
+		s.head = socket
+		s.tail = socket
+	} else {
+		s.tail.next = socket
+		socket.prev = s.tail
+		s.tail = socket
+	}
+
+	s.size++
+
+	return true
+}
+
 func (s *socketsList) recycleSocket(socket *Socket) {
 	socket.byteCountingReader.reader = nil
 	socket.byteCountingReader.totalBytes = 0
@@ -150,40 +159,4 @@ func (s *socketsList) recycleSocket(socket *Socket) {
 
 	socket.reset()
 	s.socketsPool.Put(socket)
-}
-
-func (s *socketsList) registerSocket(socket *Socket) bool {
-	s.m.Lock()
-	defer s.m.Unlock()
-
-	if s.maxSize >= 0 && s.size >= s.maxSize {
-		return false
-	}
-
-	node := s.newNode(socket)
-	if s.head == nil {
-		s.head = node
-		s.tail = node
-	} else {
-		s.tail.next = node
-		node.prev = s.tail
-		s.tail = node
-	}
-
-	s.size++
-
-	return true
-}
-
-func (s *socketsList) newNode(socket *Socket) *socketNode {
-	node := s.nodesPool.Get().(*socketNode)
-	node.socket = socket
-	return node
-}
-
-func (s *socketsList) recycleNode(node *socketNode) {
-	node.socket = nil
-	node.next = nil
-	node.prev = nil
-	s.nodesPool.Put(node)
 }
