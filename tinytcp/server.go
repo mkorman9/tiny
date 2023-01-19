@@ -241,14 +241,21 @@ func (s *Server) updateMetrics() {
 			s.metrics.MaxConnections = s.metrics.Connections
 		}
 
+		var (
+			readsPerInterval  uint64
+			writesPerInterval uint64
+		)
+
 		for socket := head; socket != nil; socket = socket.next {
 			reads, writes := socket.updateMetrics(s.config.TickInterval)
-			s.metrics.ReadsPerSecond += reads
-			s.metrics.WritesPerSecond += writes
+			readsPerInterval += reads
+			writesPerInterval += writes
 		}
 
-		s.metrics.TotalRead += s.metrics.ReadsPerSecond
-		s.metrics.TotalWritten += s.metrics.WritesPerSecond
+		s.metrics.TotalRead += readsPerInterval
+		s.metrics.TotalWritten += writesPerInterval
+		s.metrics.ReadsPerSecond = uint64(float64(readsPerInterval) / s.config.TickInterval.Seconds())
+		s.metrics.WritesPerSecond = uint64(float64(writesPerInterval) / s.config.TickInterval.Seconds())
 
 		s.forkingStrategy.OnMetricsUpdate(&s.metrics)
 
