@@ -30,8 +30,9 @@ func TestSocketInputEOF(t *testing.T) {
 	socket := MockSocket(&eofReader{}, io.Discard)
 
 	var closeHandlerCalled bool
-	socket.OnClose(func() {
+	socket.OnClose(func(reason CloseReason) {
 		closeHandlerCalled = true
+		assert.Equal(t, CloseReasonClient, reason, "close reason should be correct")
 	})
 
 	// when
@@ -64,8 +65,9 @@ func TestSocketOutputEOF(t *testing.T) {
 	socket := MockSocket(nil, &eofWriter{})
 
 	var closeHandlerCalled bool
-	socket.OnClose(func() {
+	socket.OnClose(func(reason CloseReason) {
 		closeHandlerCalled = true
+		assert.Equal(t, CloseReasonClient, reason, "close reason should be correct")
 	})
 
 	// when

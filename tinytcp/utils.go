@@ -39,6 +39,18 @@ const (
 	PrefixInt64_LE
 )
 
+// CloseReason denotes a reason that Close() function has been called for.
+// Close() can be triggered either by server, or by client (connection reset by peer).
+type CloseReason int
+
+const (
+	// CloseReasonServer means the connection has been closed intentionally on the server side.
+	CloseReasonServer CloseReason = iota
+
+	// CloseReasonClient means the connection has been either closed by client or has been lost for other reasons.
+	CloseReasonClient
+)
+
 const (
 	segmentBits = 0x7F
 	continueBit = 0x80

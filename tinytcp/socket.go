@@ -21,7 +21,7 @@ type Socket struct {
 	byteCountingWriter *byteCountingWriter
 	isClosed           uint32
 	closeOnce          sync.Once
-	closeHandlers      []func()
+	closeHandlers      []SocketCloseHandler
 	closeHandlersMutex sync.RWMutex
 
 	prev *Socket
@@ -30,6 +30,9 @@ type Socket struct {
 
 // SocketHandler represents a signature of function used by Server to handle new connections.
 type SocketHandler func(*Socket)
+
+// SocketCloseHandler represents a signature of function used by Socket to register custom close handlers.
+type SocketCloseHandler func(CloseReason)
 
 func (s *Socket) reset() {
 	s.remoteAddress = ""
@@ -64,7 +67,7 @@ func (s *Socket) IsClosed() bool {
 
 // Close closes underlying TCP connection and executes all the registered close handlers.
 // This method always returns nil, but its signature is meant to stick to the io.Closer interface.
-func (s *Socket) Close() error {
+func (s *Socket) Close(reason ...CloseReason) error {
 	s.closeOnce.Do(func() {
 		atomic.StoreUint32(&s.isClosed, 1)
 
@@ -80,9 +83,14 @@ func (s *Socket) Close() error {
 		s.closeHandlersMutex.RLock()
 		defer s.closeHandlersMutex.RUnlock()
 
+		r := CloseReasonServer
+		if reason != nil {
+			r = reason[0]
+		}
+
 		for i := len(s.closeHandlers) - 1; i >= 0; i-- {
 			handler := s.closeHandlers[i]
-			handler()
+			handler(r)
 		}
 	})
 
@@ -96,7 +104,7 @@ func (s *Socket) Read(b []byte) (int, error) {
 		if isBrokenPipe(err) {
 			log.Debug().
 				Msgf("Connection closed by TCP client: %s", s.connection.RemoteAddr().String())
-			_ = s.Close()
+			_ = s.Close(CloseReasonClient)
 		} else if isTimeout(err) {
 			// ignore
 		} else {
@@ -118,7 +126,7 @@ func (s *Socket) Write(b []byte) (int, error) {
 		if isBrokenPipe(err) {
 			log.Debug().
 				Msgf("Connection closed by TCP client: %s", s.connection.RemoteAddr().String())
-			_ = s.Close()
+			_ = s.Close(CloseReasonClient)
 		} else if isTimeout(err) {
 			// ignore
 		} else {
@@ -140,7 +148,7 @@ func (s *Socket) SetReadDeadline(deadline time.Time) error {
 		if isBrokenPipe(err) {
 			log.Debug().
 				Msgf("Connection closed by TCP client: %s", s.connection.RemoteAddr().String())
-			_ = s.Close()
+			_ = s.Close(CloseReasonClient)
 		} else if isTimeout(err) {
 			// ignore
 		} else {
@@ -162,7 +170,7 @@ func (s *Socket) SetWriteDeadline(deadline time.Time) error {
 		if isBrokenPipe(err) {
 			log.Debug().
 				Msgf("Connection closed by TCP client: %s", s.connection.RemoteAddr().String())
-			_ = s.Close()
+			_ = s.Close(CloseReasonClient)
 		} else if isTimeout(err) {
 			// ignore
 		} else {
@@ -178,7 +186,7 @@ func (s *Socket) SetWriteDeadline(deadline time.Time) error {
 }
 
 // OnClose registers a handler that is called when underlying TCP connection is being closed.
-func (s *Socket) OnClose(handler func()) {
+func (s *Socket) OnClose(handler SocketCloseHandler) {
 	s.closeHandlersMutex.Lock()
 	defer s.closeHandlersMutex.Unlock()
 
