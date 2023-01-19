@@ -7,33 +7,23 @@ import (
 )
 
 type socketsList struct {
-	head        *Socket
-	tail        *Socket
-	size        int
-	maxSize     int
-	m           sync.RWMutex
-	socketsPool sync.Pool
-	readersPool sync.Pool
-	writersPool sync.Pool
-	nodesPool   sync.Pool
+	head    *Socket
+	tail    *Socket
+	size    int
+	maxSize int
+	m       sync.RWMutex
+	pool    sync.Pool
 }
 
 func newSocketsList(maxSize int) *socketsList {
 	return &socketsList{
 		maxSize: maxSize,
-		socketsPool: sync.Pool{
+		pool: sync.Pool{
 			New: func() any {
-				return &Socket{}
-			},
-		},
-		readersPool: sync.Pool{
-			New: func() any {
-				return &byteCountingReader{}
-			},
-		},
-		writersPool: sync.Pool{
-			New: func() any {
-				return &byteCountingWriter{}
+				return &Socket{
+					byteCountingReader: &byteCountingReader{},
+					byteCountingWriter: &byteCountingWriter{},
+				}
 			},
 		},
 	}
@@ -106,20 +96,14 @@ func (s *socketsList) ExecRead(f func(head *Socket)) {
 }
 
 func (s *socketsList) newSocket(connection net.Conn) *Socket {
-	reader := s.readersPool.Get().(*byteCountingReader)
-	reader.reader = connection
-
-	writer := s.writersPool.Get().(*byteCountingWriter)
-	writer.writer = connection
-
-	socket := s.socketsPool.Get().(*Socket)
+	socket := s.pool.Get().(*Socket)
 	socket.remoteAddress = parseRemoteAddress(connection)
 	socket.connectedAt = time.Now()
 	socket.connection = connection
-	socket.reader = reader
-	socket.writer = writer
-	socket.byteCountingReader = reader
-	socket.byteCountingWriter = writer
+	socket.byteCountingReader.reader = connection
+	socket.byteCountingWriter.writer = connection
+	socket.reader = socket.byteCountingReader
+	socket.writer = socket.byteCountingWriter
 
 	return socket
 }
@@ -147,16 +131,6 @@ func (s *socketsList) registerSocket(socket *Socket) bool {
 }
 
 func (s *socketsList) recycleSocket(socket *Socket) {
-	socket.byteCountingReader.reader = nil
-	socket.byteCountingReader.total = 0
-	socket.byteCountingReader.current = 0
-	s.readersPool.Put(socket.byteCountingReader)
-
-	socket.byteCountingWriter.writer = nil
-	socket.byteCountingWriter.total = 0
-	socket.byteCountingWriter.current = 0
-	s.writersPool.Put(socket.byteCountingWriter)
-
 	socket.reset()
-	s.socketsPool.Put(socket)
+	s.pool.Put(socket)
 }

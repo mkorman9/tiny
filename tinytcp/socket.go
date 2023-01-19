@@ -37,10 +37,8 @@ type SocketCloseHandler func(CloseReason)
 func (s *Socket) reset() {
 	s.remoteAddress = ""
 	s.connection = nil
-	s.reader = nil
-	s.writer = nil
-	s.byteCountingReader = nil
-	s.byteCountingWriter = nil
+	s.byteCountingReader.reset()
+	s.byteCountingWriter.reset()
 	s.isClosed = 0
 	s.closeOnce = sync.Once{}
 	s.closeHandlers = nil

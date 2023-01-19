@@ -67,6 +67,13 @@ func (r *byteCountingReader) update(interval time.Duration) uint64 {
 	return current
 }
 
+func (r *byteCountingReader) reset() {
+	r.reader = nil
+	r.total = 0
+	r.current = 0
+	r.rate = 0
+}
+
 type byteCountingWriter struct {
 	writer  io.Writer
 	total   uint64
@@ -99,4 +106,11 @@ func (w *byteCountingWriter) update(interval time.Duration) uint64 {
 	atomic.AddUint64(&w.total, current)
 
 	return current
+}
+
+func (w *byteCountingWriter) reset() {
+	w.writer = nil
+	w.total = 0
+	w.current = 0
+	w.rate = 0
 }
