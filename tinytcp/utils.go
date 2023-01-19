@@ -10,12 +10,12 @@ import (
 	"syscall"
 )
 
-// PrefixLength denotes the length of the prefix used to specify packet length.
-type PrefixLength int
+// PrefixType denotes the type of the prefix used to specify packet length.
+type PrefixType int
 
 const (
 	// PrefixVarInt represents a VarInt prefix.
-	PrefixVarInt PrefixLength = iota
+	PrefixVarInt PrefixType = iota
 
 	// PrefixVarLong represents a VarLong prefix.
 	PrefixVarLong
