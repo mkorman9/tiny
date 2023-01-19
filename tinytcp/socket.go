@@ -224,7 +224,7 @@ func (s *Socket) TotalRead() uint64 {
 
 // ReadsPerSecond returns a total number of bytes read through socket this second.
 func (s *Socket) ReadsPerSecond() uint64 {
-	return s.byteCountingReader.Current()
+	return s.byteCountingReader.PerSecond()
 }
 
 // TotalWritten returns a total number of bytes written through this socket.
@@ -234,10 +234,11 @@ func (s *Socket) TotalWritten() uint64 {
 
 // WritesPerSecond returns a total number of bytes written through socket this second.
 func (s *Socket) WritesPerSecond() uint64 {
-	return s.byteCountingWriter.Current()
+	return s.byteCountingWriter.PerSecond()
 }
 
-func (s *Socket) resetMetrics() {
-	s.byteCountingReader.reset()
-	s.byteCountingWriter.reset()
+func (s *Socket) updateMetrics(interval time.Duration) (uint64, uint64) {
+	reads := s.byteCountingReader.update(interval)
+	writes := s.byteCountingWriter.update(interval)
+	return reads, writes
 }

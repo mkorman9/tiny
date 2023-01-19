@@ -1,6 +1,9 @@
 package tinytcp
 
-import "crypto/tls"
+import (
+	"crypto/tls"
+	"time"
+)
 
 // ServerConfig holds a configuration for NewServer.
 type ServerConfig struct {
@@ -18,13 +21,19 @@ type ServerConfig struct {
 
 	// TLSConfig is an optional TLS configuration to pass when using TLS mode.
 	TLSConfig *tls.Config
+
+	// TickInterval is an interval that is used by the server to schedule background job runs.
+	// Background job updates server-wide metrics and performs house-keeping.
+	// (default: 1s).
+	TickInterval time.Duration
 }
 
 func mergeServerConfig(provided *ServerConfig) *ServerConfig {
 	config := &ServerConfig{
-		Network:    "tcp",
-		MaxClients: -1,
-		TLSConfig:  &tls.Config{},
+		Network:      "tcp",
+		MaxClients:   -1,
+		TLSConfig:    &tls.Config{},
+		TickInterval: 1 * time.Second,
 	}
 
 	if provided == nil {
@@ -45,6 +54,9 @@ func mergeServerConfig(provided *ServerConfig) *ServerConfig {
 	}
 	if provided.TLSConfig != nil {
 		config.TLSConfig = provided.TLSConfig
+	}
+	if provided.TickInterval != 0 {
+		config.TickInterval = provided.TickInterval
 	}
 
 	return config

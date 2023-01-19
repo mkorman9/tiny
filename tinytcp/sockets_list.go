@@ -148,13 +148,13 @@ func (s *socketsList) registerSocket(socket *Socket) bool {
 
 func (s *socketsList) recycleSocket(socket *Socket) {
 	socket.byteCountingReader.reader = nil
-	socket.byteCountingReader.totalBytes = 0
-	socket.byteCountingReader.currentBytes = 0
+	socket.byteCountingReader.total = 0
+	socket.byteCountingReader.current = 0
 	s.readersPool.Put(socket.byteCountingReader)
 
 	socket.byteCountingWriter.writer = nil
-	socket.byteCountingWriter.totalBytes = 0
-	socket.byteCountingWriter.currentBytes = 0
+	socket.byteCountingWriter.total = 0
+	socket.byteCountingWriter.current = 0
 	s.writersPool.Put(socket.byteCountingWriter)
 
 	socket.reset()

@@ -22,7 +22,7 @@ type Server struct {
 	ticker               *time.Ticker
 	abortOnce            sync.Once
 	metrics              ServerMetrics
-	metricsUpdateHandler func()
+	metricsUpdateHandler func(*ServerMetrics)
 }
 
 // NewServer returns new Server instance.
@@ -81,7 +81,7 @@ func (s *Server) Metrics() ServerMetrics {
 }
 
 // OnMetricsUpdate sets a handler that is called everytime the server metrics are updated.
-func (s *Server) OnMetricsUpdate(handler func()) {
+func (s *Server) OnMetricsUpdate(handler func(*ServerMetrics)) {
 	s.metricsUpdateHandler = handler
 }
 
@@ -202,7 +202,7 @@ func (s *Server) handleNewConnection(connection net.Conn) {
 		return
 	}
 
-	log.Debug().Msgf("Opening TCP client connection: %s", socket.connection.RemoteAddr().String())
+	log.Debug().Msgf("Opening TCP client connection: %s", connection.RemoteAddr().String())
 
 	s.forkingStrategy.OnAccept(socket)
 }
@@ -220,7 +220,7 @@ func (s *Server) startBackgroundJob() {
 	}()
 
 	if s.ticker == nil {
-		s.ticker = time.NewTicker(1 * time.Second)
+		s.ticker = time.NewTicker(s.config.TickInterval)
 	}
 
 	for {
@@ -241,24 +241,19 @@ func (s *Server) updateMetrics() {
 			s.metrics.MaxConnections = s.metrics.Connections
 		}
 
-		s.forkingStrategy.OnMetricsUpdate(&s.metrics)
-
 		for socket := head; socket != nil; socket = socket.next {
-			reads := socket.ReadsPerSecond()
-			writes := socket.WritesPerSecond()
-
-			s.metrics.TotalRead += reads
-			s.metrics.TotalWritten += writes
+			reads, writes := socket.updateMetrics(s.config.TickInterval)
 			s.metrics.ReadsPerSecond += reads
 			s.metrics.WritesPerSecond += writes
 		}
 
-		if s.metricsUpdateHandler != nil {
-			s.metricsUpdateHandler()
-		}
+		s.metrics.TotalRead += s.metrics.ReadsPerSecond
+		s.metrics.TotalWritten += s.metrics.WritesPerSecond
 
-		for socket := head; socket != nil; socket = socket.next {
-			socket.resetMetrics()
+		s.forkingStrategy.OnMetricsUpdate(&s.metrics)
+
+		if s.metricsUpdateHandler != nil {
+			s.metricsUpdateHandler(&s.metrics)
 		}
 	})
 }

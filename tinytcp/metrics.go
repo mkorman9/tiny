@@ -3,6 +3,7 @@ package tinytcp
 import (
 	"io"
 	"sync/atomic"
+	"time"
 )
 
 // ServerMetrics contains basic metrics gathered from TCP server.
@@ -33,59 +34,69 @@ type ServerMetrics struct {
 }
 
 type byteCountingReader struct {
-	reader       io.Reader
-	totalBytes   uint64
-	currentBytes uint64
+	reader  io.Reader
+	total   uint64
+	current uint64
+	rate    uint64
 }
 
 func (r *byteCountingReader) Read(b []byte) (int, error) {
 	n, err := r.reader.Read(b)
 
 	if n > 0 {
-		atomic.AddUint64(&r.totalBytes, uint64(n))
-		atomic.AddUint64(&r.currentBytes, uint64(n))
+		atomic.AddUint64(&r.current, uint64(n))
 	}
 
 	return n, err
 }
 
 func (r *byteCountingReader) Total() uint64 {
-	return atomic.LoadUint64(&r.totalBytes)
+	return atomic.LoadUint64(&r.total)
 }
 
-func (r *byteCountingReader) Current() uint64 {
-	return atomic.LoadUint64(&r.currentBytes)
+func (r *byteCountingReader) PerSecond() uint64 {
+	return atomic.LoadUint64(&r.rate)
 }
 
-func (r *byteCountingReader) reset() {
-	atomic.StoreUint64(&r.currentBytes, 0)
+func (r *byteCountingReader) update(interval time.Duration) uint64 {
+	current := atomic.SwapUint64(&r.current, 0)
+
+	atomic.StoreUint64(&r.rate, uint64(float64(current)/interval.Seconds()))
+	atomic.AddUint64(&r.total, current)
+
+	return current
 }
 
 type byteCountingWriter struct {
-	writer       io.Writer
-	totalBytes   uint64
-	currentBytes uint64
+	writer  io.Writer
+	total   uint64
+	current uint64
+	rate    uint64
 }
 
 func (w *byteCountingWriter) Write(b []byte) (int, error) {
 	n, err := w.writer.Write(b)
 
 	if n > 0 {
-		atomic.AddUint64(&w.totalBytes, uint64(n))
-		atomic.AddUint64(&w.currentBytes, uint64(n))
+		atomic.AddUint64(&w.current, uint64(n))
 	}
 
 	return n, err
 }
 
 func (w *byteCountingWriter) Total() uint64 {
-	return atomic.LoadUint64(&w.totalBytes)
+	return atomic.LoadUint64(&w.total)
 }
 
-func (w *byteCountingWriter) Current() uint64 {
-	return atomic.LoadUint64(&w.currentBytes)
+func (w *byteCountingWriter) PerSecond() uint64 {
+	return atomic.LoadUint64(&w.rate)
 }
 
-func (w *byteCountingWriter) reset() {
-	atomic.StoreUint64(&w.currentBytes, 0)
+func (w *byteCountingWriter) update(interval time.Duration) uint64 {
+	current := atomic.SwapUint64(&w.current, 0)
+
+	atomic.StoreUint64(&w.rate, uint64(float64(current)/interval.Seconds()))
+	atomic.AddUint64(&w.total, current)
+
+	return current
 }
