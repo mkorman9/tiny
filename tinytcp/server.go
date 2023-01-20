@@ -140,6 +140,7 @@ func (s *Server) Stop() {
 	if s.ticker != nil {
 		s.ticker.Stop()
 	}
+	s.ticker = nil
 
 	sockets := s.Sockets()
 	for _, socket := range sockets {
