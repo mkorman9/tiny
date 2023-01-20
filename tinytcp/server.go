@@ -23,6 +23,8 @@ type Server struct {
 	abortOnce            sync.Once
 	metrics              ServerMetrics
 	metricsUpdateHandler func(*ServerMetrics)
+	startHandler         func()
+	stopHandler          func()
 }
 
 // NewServer returns new Server instance.
@@ -85,6 +87,16 @@ func (s *Server) OnMetricsUpdate(handler func(*ServerMetrics)) {
 	s.metricsUpdateHandler = handler
 }
 
+// OnStart sets a handler that is called when server starts.
+func (s *Server) OnStart(handler func()) {
+	s.startHandler = handler
+}
+
+// OnStop sets a handler that is called when server stops.
+func (s *Server) OnStop(handler func()) {
+	s.stopHandler = handler
+}
+
 // Start implements the interface of tiny.Service.
 func (s *Server) Start() error {
 	if s.forkingStrategy == nil {
@@ -98,6 +110,10 @@ func (s *Server) Start() error {
 	err := s.startServer()
 	if err != nil {
 		return err
+	}
+
+	if s.startHandler != nil {
+		s.startHandler()
 	}
 
 	log.Info().Msgf("TCP server started (%s)", s.address)
@@ -132,6 +148,10 @@ func (s *Server) Stop() {
 	s.sockets.Cleanup()
 
 	s.forkingStrategy.OnStop()
+
+	if s.stopHandler != nil {
+		s.stopHandler()
+	}
 
 	log.Info().Msgf("TCP server stopped (%s)", s.address)
 }
